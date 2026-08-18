@@ -11,7 +11,7 @@ linters:
         - (*database/sql.Rows).Close
         - (*database/sql.Tx).Rollback
         - (*os.File).Close
-        - (*gitlab.com/ebrahim580/agent-brain/internal/store.Store).Close
+        - (*github.com/ebrahim5801/agent-brain-cli/internal/store.Store).Close
         - os.RemoveAll
         - fmt.Fprintf
         - fmt.Fprintln
