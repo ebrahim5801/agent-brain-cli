@@ -1,0 +1,8 @@
+/agent-brain
+/agent-brain.exe
+/dist/
+*.db
+*.db-wal
+*.db-shm
+*.test
+*.out

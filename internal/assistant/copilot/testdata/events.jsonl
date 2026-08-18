@@ -1,0 +1,5 @@
+{"type":"session.start","sessionId":"e0d99a1b-1234-4a56-9abc-def012345678"}
+{"type":"tool.call","toolName":"read_file"}
+{"type":"tool.result","toolName":"read_file"}
+{not json
+{"type":"session.shutdown","usage":{"input_tokens":1234,"output_tokens":567,"cached_tokens":89},"model":"gpt-5-copilot"}
