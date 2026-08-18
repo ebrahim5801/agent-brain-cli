@@ -1,0 +1,36 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - depguard
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.Tx).Rollback
+        - (*os.File).Close
+        - (*gitlab.com/ebrahim580/agent-brain/internal/store.Store).Close
+        - os.RemoveAll
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*text/tabwriter.Writer).Flush
+    depguard:
+      rules:
+        # The capture path must stay offline by construction (constitution
+        # I/II): hooks, store, attribution, stats, and diagnostics never gain
+        # network capability. Cloud transport lives only in internal/syncer and
+        # the CLI's cloud commands.
+        no-network-capture-path:
+          files:
+            - "!$test"
+            - "**/internal/store/**"
+            - "**/internal/assistant/**"
+            - "**/internal/attribution/**"
+            - "**/internal/diag/**"
+            - "**/internal/stats/**"
+            - "**/tests/lintcheck/**"
+          deny:
+            - pkg: net
+              desc: "the capture path is offline-only; network belongs to syncer and the cloud commands"

@@ -1,0 +1,68 @@
+version: 2
+
+project_name: agent-brain
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/agent-brain
+    binary: agent-brain
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/ebrahim5801/agent-brain-cli/internal/version.Version={{.Version}}
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+# Stable, unversioned checksum asset name so the publish script and the release
+# server can rely on a fixed path (cli-self-update Phase 0).
+checksum:
+  name_template: "checksums.txt"
+
+nfpms:
+  - package_name: agent-brain
+    maintainer: Ebrahim <ebrahimhanna580@gmail.com>
+    description: Local collector and stats for AI coding assistant usage.
+    homepage: https://github.com/ebrahim5801/agent-brain-cli
+    formats:
+      - deb
+      - rpm
+
+release:
+  github:
+    owner: ebrahim5801
+    name: agent-brain-cli
+
+# The tap/bucket repositories do not exist yet; manifests are generated but
+# not pushed. Flip skip_upload to false once the repos are created.
+brews:
+  - repository:
+      owner: ebrahim5801
+      name: homebrew-tap
+    skip_upload: true
+    homepage: https://github.com/ebrahim5801/agent-brain-cli
+    description: Local collector and stats for AI coding assistant usage
+
+scoops:
+  - repository:
+      owner: ebrahim5801
+      name: scoop-bucket
+    skip_upload: true
+    homepage: https://github.com/ebrahim5801/agent-brain-cli
+    description: Local collector and stats for AI coding assistant usage

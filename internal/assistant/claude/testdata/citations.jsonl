@@ -1,0 +1,5 @@
+{"type":"user","message":{"role":"user","content":"can you use memory #282 and team#abc12345 for this?"},"sessionId":"sess-2","cwd":"/tmp/example","uuid":"c1"}
+{"type":"assistant","requestId":"req_1","message":{"id":"msg_01","model":"claude-fable-5","content":[{"type":"text","text":"Using memory #282 (tabs convention) and [team#abc12345] for the shared style."}]},"sessionId":"sess-2","uuid":"c2"}
+{"type":"assistant","requestId":"req_2","message":{"id":"msg_02","model":"claude-fable-5","content":[{"type":"tool_use","name":"Edit","input":{"new_string":"unrelated"}}]},"sessionId":"sess-2","uuid":"c3"}
+{"type":"assistant","requestId":"req_3","message":{"id":"msg_03","model":"claude-fable-5","content":[{"type":"text","text":"Also see PR #17 for context."}]},"sessionId":"sess-2","uuid":"c4"}
+{"type":"summary","summary":"unrelated summary text with memory #999","leafUuid":"c4"}

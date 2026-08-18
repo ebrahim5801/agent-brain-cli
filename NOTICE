@@ -1,0 +1,22 @@
+agent-brain CLI
+Copyright (c) 2026 Ebrahim Hanna
+
+This product is licensed under the Business Source License 1.1 (see LICENSE).
+
+"agent-brain" is a trademark of Ebrahim Hanna. The license does not grant
+permission to use the name or logo, except as required for reasonable and
+customary description of the origin of the work. Forks and derivative works
+must not use the agent-brain name or logo in a way that suggests endorsement.
+
+This product bundles the following third-party Go modules, each under its own
+license:
+
+  github.com/spf13/cobra                    Apache-2.0
+  github.com/google/uuid                    BSD-3-Clause
+  github.com/kljensen/snowball              MIT
+  github.com/modelcontextprotocol/go-sdk    MIT
+  github.com/jackc/pgx/v5                   MIT
+  modernc.org/sqlite                        BSD-3-Clause
+
+Full dependency licenses are reproduced in the module cache and can be listed
+with `go list -m all`.
