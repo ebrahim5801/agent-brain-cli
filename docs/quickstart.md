@@ -6,9 +6,19 @@ guide — if you want to develop agent-brain itself, see
 
 ## 1. Install
 
-Download the archive for your platform from the
-[releases page](https://github.com/ebrahim5801/agent-brain-cli/releases), or
-install from source (requires Go 1.25+):
+Clone the repository and run the installer (requires Go 1.25+). It checks the
+system requirements, builds the binary, installs it to `~/.local/bin`, and
+offers to run `agent-brain install` for you:
+
+```sh
+git clone https://github.com/ebrahim5801/agent-brain-cli.git
+cd agent-brain-cli
+./install.sh
+```
+
+On Windows use `powershell -ExecutionPolicy Bypass -File .\install.ps1`. See the
+[README](../README.md#install) for the installer's flags. To skip the script
+entirely:
 
 ```sh
 go install github.com/ebrahim5801/agent-brain-cli/cmd/agent-brain@latest
