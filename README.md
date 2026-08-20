@@ -12,7 +12,39 @@ machine unless you explicitly link a project and grant consent.
 
 ## Install
 
-Download the release for your platform, or build from source (Go 1.25+):
+Clone the repository and run the installer. It checks the system requirements,
+builds the binary, installs it, and offers to wire up your assistants — no
+manual steps.
+
+```sh
+git clone https://github.com/ebrahim5801/agent-brain-cli.git
+cd agent-brain-cli
+./install.sh
+```
+
+On Windows, run the PowerShell twin instead:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+Requirements: Go 1.25 or newer (checked against `go.mod`), Linux, macOS, or
+Windows on amd64/arm64. `git` is optional but recommended — without it, memory
+entries are stored without git context.
+
+The binary goes to `~/.local/bin` (`%LOCALAPPDATA%\Programs\agent-brain` on
+Windows). Useful flags:
+
+| Flag | Effect |
+| --- | --- |
+| `--system` | install to `/usr/local/bin` (uses `sudo`); Linux and macOS only |
+| `--bin-dir DIR` | install somewhere else (`-BinDir DIR` in PowerShell) |
+| `--yes` | no prompts; integrate assistants automatically (`-Yes`) |
+| `--no-integrate` | install the binary only (`-NoIntegrate`) |
+
+`AGENT_BRAIN_BIN_DIR` overrides the install directory for both scripts.
+
+Prefer to do it yourself?
 
 ```sh
 go install github.com/ebrahim5801/agent-brain-cli/cmd/agent-brain@latest
@@ -72,12 +104,27 @@ The CLI works fully offline and always will. Optionally, it can sync usage
 statistics and share memory with a team via a hosted backend. That backend is a
 separate, closed-source product; this repository contains only the client.
 
+## Documentation
+
+| Document | What it covers |
+| --- | --- |
+| [docs/quickstart.md](docs/quickstart.md) | Two-minute walkthrough: install, verify, first stats |
+| [docs/faq.md](docs/faq.md) | What is collected, what never leaves your machine, common questions |
+| [docs/compliance/retention.md](docs/compliance/retention.md) | Every local table and how long its rows are kept |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup, test suite, guard tests, PR expectations |
+| [SECURITY.md](SECURITY.md) | How to report a vulnerability |
+| [CHANGELOG.md](CHANGELOG.md) | Release history |
+| [LICENSE](LICENSE) / [NOTICE](NOTICE) | Business Source License 1.1 terms and attribution |
+
 ## Building
 
 ```sh
 go build ./...
 go test ./...
 ```
+
+`install.sh` builds the same way, adding `-trimpath` and the version stamp, and
+copies the result into your bin directory.
 
 ## Contributing
 
