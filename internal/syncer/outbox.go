@@ -5,13 +5,15 @@
 package syncer
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
-	"github.com/google/uuid"
 	"github.com/ebrahim5801/agent-brain-cli/internal/config"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
 	"github.com/ebrahim5801/agent-brain-cli/wire"
+	"github.com/google/uuid"
 )
 
 const (
@@ -68,7 +70,13 @@ func modelUsageSignature(refs []wire.ModelUsageRef) modelSignature {
 // projects, with their event counts aggregated, oldest first. Only sessions
 // with an end or usage already recorded sync their current snapshot; open
 // sessions sync too and are re-sent when they change (sync_dirty).
-func eligibleSessions(st *store.Store, cfg *config.Config, limit int) ([]outboxSession, error) {
+//
+// dueOnly skips rows still inside their post-rejection backoff. The delivery
+// path sets it so a permanently rejected project cannot occupy the whole
+// ORDER BY id window and starve newer rows; queue-depth reporting clears it,
+// because a deferred row is still queued and hiding it would make `status`
+// claim an empty outbox while a project quietly fails.
+func eligibleSessions(st *store.Store, cfg *config.Config, limit int, dueOnly bool) ([]outboxSession, error) {
 	if len(cfg.Links) == 0 {
 		return nil, nil
 	}
@@ -84,6 +92,12 @@ func eligibleSessions(st *store.Store, cfg *config.Config, limit int) ([]outboxS
 	// Ordering by id also sends a parent before its sub-sessions (the parent
 	// row always has the smaller id); the server does not require it, but it
 	// keeps the dashboard from briefly showing an orphaned sub-session.
+	dueClause := ""
+	if dueOnly {
+		dueClause = "\n          AND (s.sync_retry_after IS NULL OR s.sync_retry_after <= ?)"
+		identityArgs = append(identityArgs, store.Now())
+	}
+
 	query := fmt.Sprintf(`
         SELECT s.id, s.sync_uid, p.identity_kind || ':' || p.identity,
                s.assistant,
@@ -95,9 +109,9 @@ func eligibleSessions(st *store.Store, cfg *config.Config, limit int) ([]outboxS
         LEFT JOIN sessions parent ON parent.id = s.parent_session_id
         WHERE (s.synced_at IS NULL OR s.sync_dirty = 1)
           AND s.sync_uid IS NOT NULL
-          AND p.identity_kind || ':' || p.identity IN (%s)
+          AND p.identity_kind || ':' || p.identity IN (%s)%s
         ORDER BY s.id
-        LIMIT %d`, strings.Join(placeholders, ","), limit)
+        LIMIT %d`, strings.Join(placeholders, ","), dueClause, limit)
 
 	rows, err := st.Query(query, identityArgs...)
 	if err != nil {
@@ -252,6 +266,13 @@ func markSynced(st *store.Store, acked []outboxSession) error {
 			tx.Rollback()
 			return err
 		}
+		// Unconditional, unlike the snapshot-guarded UPDATE above: an ack means
+		// the server took the row, so the backoff has served its purpose even
+		// if a concurrent write left the session dirty for another pass.
+		if err := clearRejectState(tx, st, a.rowID); err != nil {
+			tx.Rollback()
+			return err
+		}
 		if _, err := tx.Exec(st.Rebind(`UPDATE events SET synced_at = ? WHERE session_id = ? AND synced_at IS NULL`), now, a.rowID); err != nil {
 			tx.Rollback()
 			return err
@@ -272,9 +293,71 @@ func markSynced(st *store.Store, acked []outboxSession) error {
 	return tx.Commit()
 }
 
+// rejectBackoffBase and rejectBackoffMax bound the per-row retry delay. The
+// base is deliberately longer than the daemon's 60s tick so a rejected row
+// leaves the batch window after a single failure rather than being retried on
+// every cycle; the cap keeps a project that regains access from waiting more
+// than a few hours to catch up on its own.
+const (
+	rejectBackoffBase = 5 * time.Minute
+	rejectBackoffMax  = 6 * time.Hour
+)
+
+// rejectBackoff is the delay after n consecutive rejections of the same row.
+func rejectBackoff(n int64) time.Duration {
+	d := rejectBackoffBase
+	for i := int64(1); i < n && d < rejectBackoffMax; i++ {
+		d *= 2
+	}
+	if d > rejectBackoffMax {
+		d = rejectBackoffMax
+	}
+	return d
+}
+
+// markRejected defers rows the server refused. The row stays queued — nothing
+// clears synced_at or sync_dirty — but sync_retry_after moves it out of the
+// delivery window so a permanently failing project cannot fill every batch and
+// starve newer sessions (the ORDER BY id window is finite).
+func markRejected(st *store.Store, rejected []outboxSession) error {
+	if len(rejected) == 0 {
+		return nil
+	}
+	tx, err := st.DB.Begin()
+	if err != nil {
+		return err
+	}
+	for _, r := range rejected {
+		var n int64
+		if err := tx.QueryRow(st.Rebind(
+			`SELECT sync_reject_count FROM sessions WHERE id = ?`), r.rowID).Scan(&n); err != nil {
+			tx.Rollback()
+			return err
+		}
+		n++
+		retryAt := time.Now().UTC().Add(rejectBackoff(n)).Format(store.TimeLayout)
+		if _, err := tx.Exec(st.Rebind(`
+            UPDATE sessions SET sync_reject_count = ?, sync_retry_after = ?
+            WHERE id = ?`), n, retryAt, r.rowID); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// clearRejectState resets the backoff once a row is finally accepted, so a
+// project that recovers does not carry an inflated delay into its next hiccup.
+func clearRejectState(tx *sql.Tx, st *store.Store, rowID int64) error {
+	_, err := tx.Exec(st.Rebind(`
+        UPDATE sessions SET sync_reject_count = 0, sync_retry_after = NULL
+        WHERE id = ? AND (sync_reject_count <> 0 OR sync_retry_after IS NOT NULL)`), rowID)
+	return err
+}
+
 // UnsyncedCount reports queue depth for heartbeat and status.
 func UnsyncedCount(st *store.Store, cfg *config.Config) int64 {
-	sessions, err := eligibleSessions(st, cfg, maxBatchSessions*10)
+	sessions, err := eligibleSessions(st, cfg, maxBatchSessions*10, false)
 	if err != nil {
 		return 0
 	}

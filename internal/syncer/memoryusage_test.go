@@ -44,7 +44,7 @@ func TestEligibleSessionsCarryMemoryUsage(t *testing.T) {
 		config.LinkKey("dir", "/proj"): {ProjectKey: "pk"},
 	}}
 
-	snapshot, err := eligibleSessions(st, cfg, 100)
+	snapshot, err := eligibleSessions(st, cfg, 100, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestEligibleSessionsCarryMemoryUsage(t *testing.T) {
 	if err := markSynced(st, snapshot); err != nil {
 		t.Fatal(err)
 	}
-	after, err := eligibleSessions(st, cfg, 100)
+	after, err := eligibleSessions(st, cfg, 100, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestMemoryUsageChangeAfterSnapshotKeepsSessionDirty(t *testing.T) {
 		config.LinkKey("dir", "/proj"): {ProjectKey: "pk"},
 	}}
 
-	snapshot, err := eligibleSessions(st, cfg, 100)
+	snapshot, err := eligibleSessions(st, cfg, 100, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestMemoryUsageChangeAfterSnapshotKeepsSessionDirty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	after, err := eligibleSessions(st, cfg, 100)
+	after, err := eligibleSessions(st, cfg, 100, true)
 	if err != nil {
 		t.Fatal(err)
 	}

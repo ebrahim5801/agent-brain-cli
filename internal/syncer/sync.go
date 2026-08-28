@@ -93,6 +93,7 @@ func (e *Engine) Run(st *store.Store) (Result, error) {
 
 		var ackedRows []outboxSession
 		acked := map[string]bool{}
+		rejected := map[string]bool{}
 		// Map each rejected sync_uid back to a recognizable project label. The
 		// wire result carries only the sync_uid, so pair it with the outbox rows
 		// (project key) and resolve the key to its link identity (e.g. the linked
@@ -111,6 +112,7 @@ func (e *Engine) Run(st *store.Store) (Result, error) {
 				acked[r.SyncUID] = true
 			case wire.StatusRejected:
 				res.Rejected++
+				rejected[r.SyncUID] = true
 				rejectCodes[r.Error]++
 				label := identityByProjectKey[keyBySyncUID[r.SyncUID]]
 				if label == "" {
@@ -123,14 +125,24 @@ func (e *Engine) Run(st *store.Store) (Result, error) {
 		// usage/model signatures, and a reconstructed zero signature would
 		// never match a session that has usage rows, leaving it eligible and
 		// spinning the drain loop forever on server-side duplicates.
+		var rejectedRows []outboxSession
 		for _, os := range sessions {
-			if acked[os.session.SyncUID] {
+			switch {
+			case acked[os.session.SyncUID]:
 				ackedRows = append(ackedRows, os)
 				res.Synced++
 				res.Projects[os.session.ProjectKey] = true
+			case rejected[os.session.SyncUID]:
+				rejectedRows = append(rejectedRows, os)
 			}
 		}
 		if err := markSynced(st, ackedRows); err != nil {
+			return res, err
+		}
+		// Defer the refused rows before deciding whether to continue: without
+		// this they stay at the head of the ORDER BY id window and every later
+		// batch re-sends them.
+		if err := markRejected(st, rejectedRows); err != nil {
 			return res, err
 		}
 		if e.Progress != nil {
@@ -144,18 +156,53 @@ func (e *Engine) Run(st *store.Store) (Result, error) {
 	}
 }
 
-// rejectionError explains a batch that was wholly rejected. The server uses
-// not_authorized for org refusals (removed member, lapsed subscription) and
-// for personal-project ones (ownership mismatch, unknown or revoked key), and
-// the client cannot tell them apart, so the message covers both; the data
-// stays queued and catches up once access is restored (machine-api-delta.md
-// §2, FR-012).
+// rejectionGuidance pairs each known reject code with the action that clears
+// it, in the order the codes are reported. The server's vocabulary is open
+// (wire.Reject*), so an unrecognized code is surfaced verbatim rather than
+// guessed at — a newer server can explain itself through an older client.
+var rejectionGuidance = []struct {
+	code   string
+	advice string
+}{
+	{wire.RejectUnknownKey, "no project on the platform matches the stored key — it was deleted there, or the key belongs to another deployment; re-run `agent-brain link` in that directory"},
+	{wire.RejectKeyRotated, "the project key was rotated — re-run `agent-brain link` in that directory to pick up the current key"},
+	{wire.RejectNotAuthorized, "this account is not authorized to write to it — for a personal project, sign in as the account that owns it; for an organization project, ask an admin to (re-)add you and confirm the team subscription is active"},
+	{wire.RejectMemoryRefNotAuthorized, "the records cite team memory entries this account may not read; re-linking will not help — ask an org admin about your team-memory access"},
+	{wire.RejectAttributionConflict, "the sync_uid already belongs to a different project or account, which usually means a copied agent-brain.db"},
+	{wire.RejectInvalidRecord, "the platform considered the records malformed; they will not start succeeding on their own, so this is worth reporting as a bug"},
+	{wire.RejectInternal, "the platform hit an internal error; the records stay queued and retry on their own"},
+}
+
+// rejectionError explains a batch that was wholly rejected. Each distinct
+// reject code contributes its own guidance, because one drain spans every
+// linked project and a single pass can hit several unrelated causes at once
+// (machine-api-delta.md §2, FR-012). The data stays queued and catches up once
+// the cause is cleared.
 func rejectionError(total int, codes map[string]int, byProject map[string]int) error {
 	where := projectBreakdown(byProject)
-	if codes["not_authorized"] > 0 {
-		return fmt.Errorf("%d record(s) rejected: this account is not authorized for %s. If a project belongs to an organization, ask an org admin to (re-)add you and confirm the team subscription is active; otherwise sign in as the account that owns it, or re-run `agent-brain link` in that directory with the current project key. Your data stays queued locally and will sync once access is restored", total, where)
+	var reasons []string
+	seen := map[string]bool{}
+	for _, g := range rejectionGuidance {
+		if codes[g.code] > 0 {
+			reasons = append(reasons, g.advice)
+			seen[g.code] = true
+		}
 	}
-	return fmt.Errorf("%d record(s) rejected by the platform for %s", total, where)
+	unknown := make([]string, 0, len(codes))
+	for code, n := range codes {
+		if !seen[code] && n > 0 {
+			unknown = append(unknown, code)
+		}
+	}
+	sort.Strings(unknown)
+	if len(unknown) > 0 {
+		reasons = append(reasons, "the platform reported "+strings.Join(unknown, ", "))
+	}
+	if len(reasons) == 0 {
+		return fmt.Errorf("%d record(s) rejected by the platform for %s", total, where)
+	}
+	return fmt.Errorf("%d record(s) rejected for %s: %s. Your data stays queued locally and will sync once the cause is cleared",
+		total, where, strings.Join(reasons, "; also, "))
 }
 
 // projectBreakdown names which linked projects had records rejected. Because
@@ -184,7 +231,7 @@ func projectBreakdown(byProject map[string]int) string {
 }
 
 func nextBatch(st *store.Store, cfg *config.Config) (wire.Batch, []outboxSession, error) {
-	sessions, err := eligibleSessions(st, cfg, maxBatchSessions)
+	sessions, err := eligibleSessions(st, cfg, maxBatchSessions, true)
 	if err != nil {
 		return wire.Batch{}, nil, err
 	}

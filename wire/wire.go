@@ -81,6 +81,35 @@ const (
 	StatusRejected  = "rejected"
 )
 
+// Reject codes carried in Result.Error. The set is open: a client that meets an
+// unknown code reports it verbatim rather than guessing, so the server may add
+// codes without a schema bump. RejectNotAuthorized used to absorb
+// RejectUnknownKey and RejectKeyRotated, which left the operator unable to tell
+// "the project is gone" from "sign in as someone else" — the three now travel
+// separately and the client's guidance differs for each.
+const (
+	// RejectUnknownKey: no live project matches the key. Deleted project, or a
+	// key from a different deployment.
+	RejectUnknownKey = "unknown_key"
+	// RejectKeyRotated: the project exists but this key was superseded; the
+	// directory needs re-linking with the current key.
+	RejectKeyRotated = "key_rotated"
+	// RejectNotAuthorized: the key resolves but this account may not write to
+	// it — personal project owned by someone else, or an org project where
+	// membership is inactive or the subscription lapsed.
+	RejectNotAuthorized = "not_authorized"
+	// RejectMemoryRefNotAuthorized: the session itself is fine, but it cites
+	// team memory entries the account may not read. Re-linking would not help.
+	RejectMemoryRefNotAuthorized = "memory_ref_not_authorized"
+	// RejectInvalidRecord: the record is malformed and will never be accepted.
+	RejectInvalidRecord = "invalid_record"
+	// RejectAttributionConflict: the sync_uid already belongs to a different
+	// project or account.
+	RejectAttributionConflict = "attribution_conflict"
+	// RejectInternal: a server-side failure. Transient; the row stays queued.
+	RejectInternal = "internal"
+)
+
 type Result struct {
 	SyncUID string `json:"sync_uid"`
 	Status  string `json:"status"`
