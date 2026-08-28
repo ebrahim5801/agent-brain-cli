@@ -44,3 +44,51 @@ func TestRejectionErrorNonAuthStillNamesProject(t *testing.T) {
 		t.Fatalf("want project named for generic rejection too, got %q", msg)
 	}
 }
+
+func TestRejectionErrorDistinguishesUnknownKeyFromNotAuthorized(t *testing.T) {
+	unknown := rejectionError(4, map[string]int{"unknown_key": 4}, map[string]int{"dir:/x": 4}).Error()
+	if !strings.Contains(unknown, "deleted there") {
+		t.Fatalf("unknown_key should advise the project is gone, got %q", unknown)
+	}
+	if strings.Contains(unknown, "not authorized") {
+		t.Fatalf("unknown_key must not be reported as an authorization failure, got %q", unknown)
+	}
+
+	rotated := rejectionError(4, map[string]int{"key_rotated": 4}, map[string]int{"dir:/x": 4}).Error()
+	if !strings.Contains(rotated, "rotated") {
+		t.Fatalf("key_rotated should advise re-linking, got %q", rotated)
+	}
+	if strings.Contains(rotated, "not authorized") {
+		t.Fatalf("key_rotated must not be reported as an authorization failure, got %q", rotated)
+	}
+}
+
+func TestRejectionErrorReportsSeveralCodesTogether(t *testing.T) {
+	msg := rejectionError(6, map[string]int{"unknown_key": 2, "not_authorized": 4}, map[string]int{
+		"dir:/a": 2,
+		"dir:/b": 4,
+	}).Error()
+	if !strings.Contains(msg, "deleted there") || !strings.Contains(msg, "not authorized") {
+		t.Fatalf("want guidance for both codes, got %q", msg)
+	}
+	if !strings.Contains(msg, "also,") {
+		t.Fatalf("want the two reasons joined, got %q", msg)
+	}
+}
+
+func TestRejectionErrorSurfacesUnknownCodeVerbatim(t *testing.T) {
+	msg := rejectionError(1, map[string]int{"teapot_shortage": 1}, map[string]int{"dir:/x": 1}).Error()
+	if !strings.Contains(msg, "teapot_shortage") {
+		t.Fatalf("an unrecognized code must be reported verbatim, got %q", msg)
+	}
+}
+
+func TestRejectionErrorMemoryRefCodeDoesNotAdviseRelinking(t *testing.T) {
+	msg := rejectionError(2, map[string]int{"memory_ref_not_authorized": 2}, map[string]int{"dir:/x": 2}).Error()
+	if !strings.Contains(msg, "team memory entries") {
+		t.Fatalf("want team-memory wording, got %q", msg)
+	}
+	if strings.Contains(msg, "agent-brain link") {
+		t.Fatalf("re-linking does not clear a team-ref rejection, got %q", msg)
+	}
+}

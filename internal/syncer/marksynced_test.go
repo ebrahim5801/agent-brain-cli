@@ -37,7 +37,7 @@ func TestMarkSyncedKeepsDirtyOnConcurrentUpdate(t *testing.T) {
 	}}
 
 	// Snapshot the open session as the sync loop would.
-	snapshot, err := eligibleSessions(st, cfg, 100)
+	snapshot, err := eligibleSessions(st, cfg, 100, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestMarkSyncedKeepsDirtyOnConcurrentUpdate(t *testing.T) {
 	}
 
 	// The row must still be eligible so its corrected state re-syncs.
-	after, err := eligibleSessions(st, cfg, 100)
+	after, err := eligibleSessions(st, cfg, 100, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestMarkSyncedKeepsDirtyOnConcurrentUpdate(t *testing.T) {
 	if err := markSynced(st, after); err != nil {
 		t.Fatal(err)
 	}
-	final, err := eligibleSessions(st, cfg, 100)
+	final, err := eligibleSessions(st, cfg, 100, true)
 	if err != nil {
 		t.Fatal(err)
 	}

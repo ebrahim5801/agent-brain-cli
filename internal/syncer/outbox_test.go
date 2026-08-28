@@ -44,7 +44,7 @@ func TestEligibleSessionsCarryTrueAssistantPerRow(t *testing.T) {
 		config.LinkKey("dir", "/proj"): {ProjectKey: "pk"},
 	}}
 
-	sessions, err := eligibleSessions(st, cfg, 100)
+	sessions, err := eligibleSessions(st, cfg, 100, true)
 	if err != nil {
 		t.Fatal(err)
 	}

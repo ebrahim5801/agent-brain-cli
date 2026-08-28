@@ -41,7 +41,7 @@ func TestEligibleSessionsCarryModelUsage(t *testing.T) {
 		config.LinkKey("dir", "/proj"): {ProjectKey: "pk"},
 	}}
 
-	snapshot, err := eligibleSessions(st, cfg, 100)
+	snapshot, err := eligibleSessions(st, cfg, 100, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestEligibleSessionsCarryModelUsage(t *testing.T) {
 	if err := markSynced(st, snapshot); err != nil {
 		t.Fatal(err)
 	}
-	after, err := eligibleSessions(st, cfg, 100)
+	after, err := eligibleSessions(st, cfg, 100, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestModelUsageChangeAfterSnapshotKeepsSessionDirty(t *testing.T) {
 		config.LinkKey("dir", "/proj"): {ProjectKey: "pk"},
 	}}
 
-	snapshot, err := eligibleSessions(st, cfg, 100)
+	snapshot, err := eligibleSessions(st, cfg, 100, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestModelUsageChangeAfterSnapshotKeepsSessionDirty(t *testing.T) {
 	if err := markSynced(st, snapshot); err != nil {
 		t.Fatal(err)
 	}
-	after, err := eligibleSessions(st, cfg, 100)
+	after, err := eligibleSessions(st, cfg, 100, true)
 	if err != nil {
 		t.Fatal(err)
 	}

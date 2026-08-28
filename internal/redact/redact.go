@@ -25,6 +25,14 @@ var rules = []rule{
 	{kind: "slack-token", re: regexp.MustCompile(`\bxox[baprs]-[A-Za-z0-9-]{10,}\b`)},
 	{kind: "stripe-key", re: regexp.MustCompile(`\b[sr]k_(?:live|test)_[A-Za-z0-9]{16,}\b`)},
 	{kind: "google-key", re: regexp.MustCompile(`\bAIza[0-9A-Za-z_\-]{35}\b`)},
+	// Anthropic must precede the OpenAI rule: sk-ant-… also satisfies the
+	// broader sk-… shape, and whichever runs first consumes the match.
+	{kind: "anthropic-key", re: regexp.MustCompile(`\bsk-ant-[A-Za-z0-9_\-]{20,}`)},
+	{kind: "openai-key", re: regexp.MustCompile(`\bsk-(?:proj-)?[A-Za-z0-9_\-]{20,}`)},
+	{kind: "npm-token", re: regexp.MustCompile(`\bnpm_[A-Za-z0-9]{30,}\b`)},
+	{kind: "huggingface-token", re: regexp.MustCompile(`\bhf_[A-Za-z0-9]{30,}\b`)},
+	{kind: "sendgrid-key", re: regexp.MustCompile(`\bSG\.[A-Za-z0-9_\-]{16,}\.[A-Za-z0-9_\-]{16,}`)},
+	{kind: "mailgun-key", re: regexp.MustCompile(`\bkey-[0-9a-f]{32}\b`)},
 	{kind: "jwt", re: regexp.MustCompile(`\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b`)},
 	{kind: "bearer", re: regexp.MustCompile(`(?i)\b(?:bearer|authorization:\s*bearer)\s+([A-Za-z0-9_\-.~+/=]{16,})`), group: 1},
 	{kind: "credential", re: regexp.MustCompile(`(?i)\b(password|passwd|secret|api[_-]?key|access[_-]?key|auth[_-]?token|client[_-]?secret|token)\b\s*[:=]+\s*["']?([^\s"']{8,})["']?`), group: 2},

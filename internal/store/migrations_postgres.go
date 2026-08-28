@@ -177,6 +177,11 @@ CREATE INDEX idx_session_model_usage_unsynced ON session_model_usage(session_id)
 	`
 ALTER TABLE sessions ADD COLUMN memory_prompt_injected_at TEXT;
 `,
+	`
+ALTER TABLE sessions ADD COLUMN sync_reject_count BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN sync_retry_after TEXT;
+CREATE INDEX idx_sessions_sync_retry ON sessions(sync_retry_after) WHERE sync_retry_after IS NOT NULL;
+`,
 }
 
 // identityTables lists the tables whose id is a generated identity column, in
