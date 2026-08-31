@@ -103,3 +103,52 @@ func TestRankTieBreaksNewestFirst(t *testing.T) {
 		t.Errorf("tie should break to higher ID first, got %d", ranked[0].Entry.ID)
 	}
 }
+
+func TestPriorityWeights(t *testing.T) {
+	for _, tc := range []struct {
+		priority string
+		want     float64
+	}{
+		{PriorityCritical, 2.0},
+		{PriorityNormal, 1.0},
+		{PriorityBackground, 0.5},
+		{"", 1.0},
+		{"urgent", 1.0},
+	} {
+		if got := priorityWeight(tc.priority); got != tc.want {
+			t.Errorf("priorityWeight(%q) = %v, want %v", tc.priority, got, tc.want)
+		}
+	}
+}
+
+// The floor is the substantive half of the feature: a critical entry must stop
+// aging out of the pack, while staying rankable against fresher work.
+func TestCriticalDecayFloorOutranksStaleNormal(t *testing.T) {
+	now := time.Now()
+	sixMonthsAgo := now.Add(-180 * 24 * time.Hour).Format(store.TimeLayout)
+	twoWeeksAgo := now.Add(-14 * 24 * time.Hour).Format(store.TimeLayout)
+
+	oldCritical := entryScore(PriorityCritical, OriginAuto, gitstate.Current, sixMonthsAgo, now)
+	freshNormal := entryScore(PriorityNormal, OriginAuto, gitstate.Current, twoWeeksAgo, now)
+	if oldCritical <= freshNormal {
+		t.Errorf("6-month critical %v did not outrank 2-week normal %v", oldCritical, freshNormal)
+	}
+
+	// Floored, not exempt: a fresh critical entry still beats a stale one, so
+	// current work is not permanently buried under old critical entries.
+	freshCritical := entryScore(PriorityCritical, OriginAuto, gitstate.Current, now.Format(store.TimeLayout), now)
+	if freshCritical <= oldCritical {
+		t.Errorf("fresh critical %v did not outrank 6-month critical %v", freshCritical, oldCritical)
+	}
+}
+
+// Rows written before the column existed, and team entries pulled from a server
+// that predates the field, must rank exactly as they did before.
+func TestEmptyPriorityRanksAsNormal(t *testing.T) {
+	now := time.Now()
+	at := now.Add(-3 * 24 * time.Hour).Format(store.TimeLayout)
+	if got, want := entryScore("", OriginExplicit, gitstate.MovedOn, at, now),
+		entryScore(PriorityNormal, OriginExplicit, gitstate.MovedOn, at, now); got != want {
+		t.Errorf("empty priority scored %v, normal scored %v", got, want)
+	}
+}

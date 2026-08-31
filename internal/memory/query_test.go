@@ -23,7 +23,7 @@ func TestSearchKeywordsAndKind(t *testing.T) {
 	seed(t, st, projectID, dir, "Postgres runs in docker locally", "fact")
 	seed(t, st, projectID, dir, "retry uses exponential backoff", "decision")
 
-	got, err := Search(st, projectID, dir, "postgres", "", 10, 0, time.Now())
+	got, err := Search(st, projectID, dir, "postgres", Filter{}, 10, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestSearchKeywordsAndKind(t *testing.T) {
 
 	// OR-with-ranking: both entries mentioning postgres match, and the one
 	// matching both keywords (pgx + postgres) ranks first.
-	got, err = Search(st, projectID, dir, "POSTGRES pgx", "", 10, 0, time.Now())
+	got, err = Search(st, projectID, dir, "POSTGRES pgx", Filter{}, 10, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestSearchKeywordsAndKind(t *testing.T) {
 		t.Fatalf("best keyword match should rank first, got %q", got[0].Entry.Content)
 	}
 
-	got, err = Search(st, projectID, dir, "postgres", "fact", 10, 0, time.Now())
+	got, err = Search(st, projectID, dir, "postgres", Filter{Kind: "fact"}, 10, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestSearchKeywordsAndKind(t *testing.T) {
 	}
 
 	// Empty query returns everything, capped by limit.
-	got, err = Search(st, projectID, dir, "", "", 2, 0, time.Now())
+	got, err = Search(st, projectID, dir, "", Filter{}, 2, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestSearchBM25RarerTermOutranksCommon(t *testing.T) {
 	seed(t, st, projectID, dir, "we rely on common config here", "fact")
 	seed(t, st, projectID, dir, "we rely on rare config here", "fact")
 
-	got, err := Search(st, projectID, dir, "common rare", "", 10, 0, time.Now())
+	got, err := Search(st, projectID, dir, "common rare", Filter{}, 10, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestSearchScopedToProject(t *testing.T) {
 	seed(t, st, projectID, dir, "mine: uses redis", "fact")
 	seed(t, st, other, dir, "theirs: uses redis", "fact")
 
-	got, err := Search(st, projectID, dir, "redis", "", 10, 0, time.Now())
+	got, err := Search(st, projectID, dir, "redis", Filter{}, 10, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestSearchStemmingMatchesMorphologicalVariant(t *testing.T) {
 	seed(t, st, projectID, dir, "tests run before merging", "fact")
 	seed(t, st, projectID, dir, "retry uses exponential backoff", "decision")
 
-	got, err := Search(st, projectID, dir, "running", "", 10, 0, time.Now())
+	got, err := Search(st, projectID, dir, "running", Filter{}, 10, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestSearchSynonymExpansionMatchesMappedTerm(t *testing.T) {
 	seed(t, st, projectID, dir, "user login flow uses sessions", "fact")
 	seed(t, st, projectID, dir, "retry uses exponential backoff", "decision")
 
-	got, err := Search(st, projectID, dir, "auth", "", 10, 0, time.Now())
+	got, err := Search(st, projectID, dir, "auth", Filter{}, 10, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,11 +145,11 @@ func TestSearchSynonymExpansionDedupesWithoutDistortingRanking(t *testing.T) {
 	seed(t, st, projectID, dir, "retry uses exponential backoff", "decision")
 
 	now := time.Now()
-	single, err := Search(st, projectID, dir, "postgres", "", 10, 0, now)
+	single, err := Search(st, projectID, dir, "postgres", Filter{}, 10, 0, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	repeated, err := Search(st, projectID, dir, "postgres pg postgresql", "", 10, 0, now)
+	repeated, err := Search(st, projectID, dir, "postgres pg postgresql", Filter{}, 10, 0, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,5 +184,79 @@ func TestListIncludesSupersededOnRequest(t *testing.T) {
 	}
 	if len(all) != 2 || all[0].Entry.Status != store.MemoryActive {
 		t.Fatalf("full list = %+v", all)
+	}
+}
+
+func TestSearchPriorityFilter(t *testing.T) {
+	st, projectID := openStore(t)
+	dir := t.TempDir()
+	base := SaveInput{ProjectID: projectID, Dir: dir, Kind: "fact", Origin: OriginAuto}
+
+	crit := base
+	crit.Content, crit.Priority = "postgres cutover is blocked", PriorityCritical
+	if _, err := Save(st, crit); err != nil {
+		t.Fatal(err)
+	}
+	bg := base
+	bg.Content, bg.Priority = "postgres was once mysql", PriorityBackground
+	if _, err := Save(st, bg); err != nil {
+		t.Fatal(err)
+	}
+	norm := base
+	norm.Content = "postgres runs in docker"
+	if _, err := Save(st, norm); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		priority string
+		want     int
+	}{{PriorityCritical, 1}, {PriorityBackground, 1}, {PriorityNormal, 1}} {
+		got, err := Search(st, projectID, dir, "postgres", Filter{Priority: tc.priority}, 10, 0, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != tc.want {
+			t.Errorf("priority %q matched %d, want %d", tc.priority, len(got), tc.want)
+		}
+	}
+
+	both, err := Search(st, projectID, dir, "postgres", Filter{Kind: "decision", Priority: PriorityCritical}, 10, 0, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(both) != 0 {
+		t.Errorf("kind and priority should both narrow, got %d", len(both))
+	}
+}
+
+// Priority governs what survives the pack budget, not what answers a query: the
+// BM25 spread is wider than the 2× priority range, so a strong term match on a
+// normal entry outranks a weak match on a critical one. Pinned so a later weight
+// tweak cannot silently invert it.
+func TestSearchRelevanceOutranksPriority(t *testing.T) {
+	st, projectID := openStore(t)
+	dir := t.TempDir()
+
+	weak := SaveInput{ProjectID: projectID, Dir: dir, Kind: "fact", Origin: OriginAuto,
+		Priority: PriorityCritical, Content: "the deploy pipeline mentions postgres once in passing here"}
+	if _, err := Save(st, weak); err != nil {
+		t.Fatal(err)
+	}
+	strong := SaveInput{ProjectID: projectID, Dir: dir, Kind: "fact", Origin: OriginAuto,
+		Content: "postgres postgres postgres"}
+	if _, err := Save(st, strong); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Search(st, projectID, dir, "postgres", Filter{}, 10, 0, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("matches = %d, want 2", len(got))
+	}
+	if got[0].Entry.Content != "postgres postgres postgres" {
+		t.Errorf("strong normal match did not outrank weak critical match: %q first", got[0].Entry.Content)
 	}
 }

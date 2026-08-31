@@ -22,6 +22,7 @@ const distillationReason = "Before finishing: distill this session's durable con
 	"as a separate agent-brain-memory memory_save call (kind: decision|convention|task_state|fact, origin: auto). " +
 	"Supersede any existing memory entry this session contradicted (supersedes:[id]). " +
 	"Mark anything that is personal working context rather than shared team knowledge with personal_only: true. " +
+	"Mark an entry priority: \"critical\" only if it blocks work or will silently cause harm if forgotten, \"background\" if it is worth keeping but first to cut when the budget is tight; otherwise leave it unset. " +
 	"Do not save secrets, credentials, or session trivia. " +
 	"Also call session_summary once with 2-3 sentences covering the whole session so far (the goal, what changed, the outcome), replacing any earlier summary — it stays on this machine. " +
 	"If nothing durable happened, save nothing. Then stop."
@@ -36,6 +37,7 @@ const checkpointReason = "Checkpoint before you lose context: save any durable c
 	"as a separate agent-brain-memory memory_save call (kind: decision|convention|task_state|fact, origin: auto). " +
 	"Supersede any existing memory entry this session contradicted (supersedes:[id]). " +
 	"Mark anything that is personal working context rather than shared team knowledge with personal_only: true. " +
+	"Mark an entry priority: \"critical\" only if it blocks work or will silently cause harm if forgotten, \"background\" if it is worth keeping but first to cut when the budget is tight; otherwise leave it unset. " +
 	"Do not save secrets, credentials, or session trivia, and do not re-save anything already captured this session. " +
 	"Do not call session_summary. If nothing durable is worth saving yet, save nothing. " +
 	"Then continue with your task."

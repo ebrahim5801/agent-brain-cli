@@ -35,6 +35,7 @@ func newMemoryCmd() *cobra.Command {
 		newMemoryListCmd(),
 		newMemoryShowCmd(),
 		newMemoryEditCmd(),
+		newMemoryPriorityCmd(),
 		newMemoryDeleteCmd(),
 		newMemoryWipeCmd(),
 		newMemoryRestoreCmd(),
@@ -66,6 +67,8 @@ func currentProject(st *store.Store) (projectID int64, identity string, found bo
 func newMemoryListCmd() *cobra.Command {
 	var all bool
 	var kind string
+	var priority string
+	var critical bool
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -89,10 +92,17 @@ func newMemoryListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if kind != "" {
+			if critical {
+				priority = memory.PriorityCritical
+			}
+			if priority != "" && !memory.ValidPriority(priority) {
+				return fmt.Errorf("unknown priority %q; want one of: %s", priority, strings.Join(memory.Priorities, ", "))
+			}
+			if kind != "" || priority != "" {
+				filter := memory.Filter{Kind: kind, Priority: priority}
 				var filtered []memory.Ranked
 				for _, r := range entries {
-					if r.Entry.Kind == kind {
+					if filter.Matches(r.Entry) {
 						filtered = append(filtered, r)
 					}
 				}
@@ -117,6 +127,9 @@ func newMemoryListCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&all, "all", false, "include superseded and deleted entries")
 	cmd.Flags().StringVar(&kind, "kind", "", "filter by kind (decision, convention, task_state, fact)")
+	cmd.Flags().StringVar(&priority, "priority", "", "filter by priority (critical, normal, background)")
+	cmd.Flags().BoolVar(&critical, "critical", false, "only critical entries (shorthand for --priority critical)")
+	cmd.MarkFlagsMutuallyExclusive("critical", "priority")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "machine-readable output")
 	return cmd
 }
@@ -125,6 +138,7 @@ type memoryJSON struct {
 	ID         int64  `json:"id"`
 	Kind       string `json:"kind"`
 	Origin     string `json:"origin"`
+	Priority   string `json:"priority"`
 	Status     string `json:"status"`
 	Content    string `json:"content"`
 	Branch     string `json:"branch,omitempty"`
@@ -139,7 +153,7 @@ func printMemoriesJSON(entries []memory.Ranked) error {
 	out := make([]memoryJSON, 0, len(entries))
 	for _, r := range entries {
 		out = append(out, memoryJSON{
-			ID: r.Entry.ID, Kind: r.Entry.Kind, Origin: r.Entry.Origin, Status: r.Entry.Status,
+			ID: r.Entry.ID, Kind: r.Entry.Kind, Origin: r.Entry.Origin, Priority: r.Entry.Priority, Status: r.Entry.Status,
 			Content: r.Entry.Content, Branch: r.Entry.Branch.String, Commit: r.Entry.CommitHash.String,
 			CapturedAt: r.Entry.CapturedAt, Freshness: r.Freshness.Render(),
 			Edited: r.Entry.Edited, Superseded: r.Entry.SupersededBy.Int64,
@@ -249,6 +263,42 @@ func newMemoryEditCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&content, "content", "", "new content (skips the editor)")
 	return cmd
+}
+
+func newMemoryPriorityCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "priority <id> <critical|normal|background>",
+		Short: "Reclassify how hard an entry competes for the session-start memory budget",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if handle := strings.TrimPrefix(args[0], "team#"); handle != args[0] {
+				return fmt.Errorf("team#%s is a teammate's entry; its priority is set by its author. "+
+					"To disagree with it, save your own entry with supersedes_team: [\"team#%s\"]", handle, handle)
+			}
+			id, err := parseMemoryID(args[0])
+			if err != nil {
+				return err
+			}
+			st, err := store.Open()
+			if err != nil {
+				return err
+			}
+			defer st.Close()
+			shared, err := st.MemoryShared(id)
+			if err != nil {
+				return err
+			}
+			if err := memory.SetPriority(st, id, args[1]); err != nil {
+				return err
+			}
+			fmt.Printf("Memory %d is now %s.\n", id, args[1])
+			if shared {
+				fmt.Println("Note: this entry is already shared with the team; the change is local. " +
+					"Teammates keep the priority it was contributed with.")
+			}
+			return nil
+		},
+	}
 }
 
 func editInEditor(initial string) (string, error) {

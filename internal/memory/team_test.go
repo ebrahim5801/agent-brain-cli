@@ -189,7 +189,7 @@ func TestTeamSearchFiltersByKeyword(t *testing.T) {
 		teamRow("u1", "a@example.com", "retries use backoff"),
 		teamRow("u2", "a@example.com", "deploy on fridays"),
 	)
-	lines, _, err := TeamSearch(st, projectID, dir, "backoff", "", 10, 0, time.Now())
+	lines, _, err := TeamSearch(st, projectID, dir, "backoff", Filter{}, 10, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestTeamSearchReturnsServedUIDs(t *testing.T) {
 		teamRow("u1", "a@example.com", "retries use backoff"),
 		teamRow("u2", "a@example.com", "deploy on fridays"),
 	)
-	lines, uids, err := TeamSearch(st, projectID, dir, "backoff", "", 10, 0, time.Now())
+	lines, uids, err := TeamSearch(st, projectID, dir, "backoff", Filter{}, 10, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestTeamSearchBM25MultiTermRanksFirst(t *testing.T) {
 		teamRow("u3", "a@example.com", "retry uses exponential backoff"),
 	)
 
-	lines, _, err := TeamSearch(st, projectID, dir, "postgres pgx", "", 10, 0, time.Now())
+	lines, _, err := TeamSearch(st, projectID, dir, "postgres pgx", Filter{}, 10, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +255,7 @@ func TestTeamSearchStemmingAndSynonyms(t *testing.T) {
 		teamRow("u3", "a@example.com", "deploy on fridays"),
 	)
 
-	lines, _, err := TeamSearch(st, projectID, dir, "running", "", 10, 0, time.Now())
+	lines, _, err := TeamSearch(st, projectID, dir, "running", Filter{}, 10, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestTeamSearchStemmingAndSynonyms(t *testing.T) {
 		t.Errorf("stemmed match = %v", lines)
 	}
 
-	lines, _, err = TeamSearch(st, projectID, dir, "auth", "", 10, 0, time.Now())
+	lines, _, err = TeamSearch(st, projectID, dir, "auth", Filter{}, 10, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

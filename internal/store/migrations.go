@@ -186,6 +186,11 @@ ALTER TABLE sessions ADD COLUMN sync_reject_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE sessions ADD COLUMN sync_retry_after TEXT;
 CREATE INDEX idx_sessions_sync_retry ON sessions(sync_retry_after) WHERE sync_retry_after IS NOT NULL;
 `,
+	`
+ALTER TABLE memories ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal';
+ALTER TABLE team_memories ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal';
+CREATE INDEX idx_memories_priority ON memories(project_id, priority) WHERE status = 'active';
+`,
 }
 
 // migrate applies forward migrations for the given backend. SQLite walks the

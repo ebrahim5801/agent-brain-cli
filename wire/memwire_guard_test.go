@@ -16,6 +16,7 @@ var approvedMemoryFields = map[string]bool{
 	"content":         true,
 	"kind":            true,
 	"origin":          true,
+	"priority":        true,
 	"captured_at":     true,
 	"branch":          true,
 	"commit_hash":     true,

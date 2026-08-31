@@ -130,6 +130,29 @@ func TestBackendMatrix(t *testing.T) {
 				t.Fatalf("want 0 pending after mark shared, got %d", len(p))
 			}
 			_ = shareID
+
+			// A priority outside the vocabulary must never reach the column:
+			// the Postgres CHECK would abort the whole ApplyPull transaction,
+			// and since a pull replays from the same cursor, every later pull
+			// would fail identically — sync stuck, not degraded. SQLite has no
+			// CHECK, so only this backend pair proves the coercion is required
+			// rather than merely tidy.
+			if err := st.ApplyPull(pid, []store.TeamMemoryRow{{
+				UID: "team-bbbb", Author: "b@example.com", Content: "from a newer server",
+				Kind: "fact", Origin: "auto", Priority: "urgent", Status: "active",
+				CapturedAt: store.Now(), UpdatedAt: store.Now(),
+			}}); err != nil {
+				t.Fatalf("apply pull with unknown priority: %v", err)
+			}
+			cached, err := st.ListTeamMemories(pid)
+			if err != nil {
+				t.Fatalf("list team: %v", err)
+			}
+			for _, r := range cached {
+				if r.UID == "team-bbbb" && r.Priority != store.MemoryPriorityNormal {
+					t.Fatalf("unknown priority stored as %q", r.Priority)
+				}
+			}
 		})
 	}
 }

@@ -528,3 +528,37 @@ func TestSessionActivity(t *testing.T) {
 		t.Errorf("activity = %d/%d, %v", prompts, tools, err)
 	}
 }
+
+func TestMemoryPriorityCounts(t *testing.T) {
+	st, projectID, _ := openMemStore(t)
+	at := Now()
+	insert := func(content, priority string) int64 {
+		id, err := st.InsertMemory(NewMemory{ProjectID: projectID, Content: content,
+			Kind: "fact", Origin: "auto", Priority: priority}, at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	insert("a", MemoryPriorityCritical)
+	insert("b", MemoryPriorityBackground)
+	insert("c", "")
+	superseded := insert("d", MemoryPriorityCritical)
+	live := insert("e", MemoryPriorityNormal)
+	if err := st.SupersedeMemory(superseded, live, projectID, at); err != nil {
+		t.Fatal(err)
+	}
+
+	counts, err := st.MemoryPriorityCounts(projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// An unset priority is stored as the default, and a superseded entry is not
+	// competing for the budget so it must not inflate the share.
+	want := map[string]int{MemoryPriorityCritical: 1, MemoryPriorityNormal: 2, MemoryPriorityBackground: 1}
+	for k, v := range want {
+		if counts[k] != v {
+			t.Errorf("%s = %d, want %d (got %v)", k, counts[k], v, counts)
+		}
+	}
+}

@@ -205,3 +205,85 @@ func TestEditRedactsAndPreservesProvenance(t *testing.T) {
 		t.Errorf("empty edit err = %v", err)
 	}
 }
+
+func TestSavePriority(t *testing.T) {
+	st, projectID := openStore(t)
+	base := SaveInput{ProjectID: projectID, Dir: t.TempDir(), Content: "x", Kind: "decision", Origin: OriginAuto}
+
+	for _, p := range Priorities {
+		in := base
+		in.Priority = p
+		res, err := Save(st, in)
+		if err != nil {
+			t.Fatalf("save %q: %v", p, err)
+		}
+		m, err := st.GetMemory(res.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m.Priority != p {
+			t.Errorf("priority = %q, want %q", m.Priority, p)
+		}
+	}
+
+	res, err := Save(st, base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := st.GetMemory(res.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Priority != PriorityNormal {
+		t.Errorf("unset priority stored as %q, want %q", m.Priority, PriorityNormal)
+	}
+
+	bad := base
+	bad.Priority = "urgent"
+	if _, err := Save(st, bad); !errors.Is(err, ErrBadPriority) {
+		t.Errorf("bad priority err = %v", err)
+	}
+}
+
+func TestSetPriority(t *testing.T) {
+	st, projectID := openStore(t)
+	res, err := Save(st, SaveInput{ProjectID: projectID, Dir: t.TempDir(), Content: "x",
+		Kind: "decision", Origin: OriginAuto})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := SetPriority(st, res.ID, PriorityCritical); err != nil {
+		t.Fatal(err)
+	}
+	m, err := st.GetMemory(res.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Priority != PriorityCritical {
+		t.Errorf("priority = %q", m.Priority)
+	}
+	// Reclassification is not a content edit.
+	if m.Edited {
+		t.Error("SetPriority set the edited flag")
+	}
+	// Unlike the save path, an empty value here is a mistake, not a default.
+	if err := SetPriority(st, res.ID, ""); !errors.Is(err, ErrBadPriority) {
+		t.Errorf("empty priority err = %v", err)
+	}
+	if err := SetPriority(st, res.ID, "urgent"); !errors.Is(err, ErrBadPriority) {
+		t.Errorf("invalid priority err = %v", err)
+	}
+}
+
+func TestValidPriority(t *testing.T) {
+	for _, p := range Priorities {
+		if !ValidPriority(p) {
+			t.Errorf("ValidPriority(%q) = false", p)
+		}
+	}
+	for _, p := range []string{"", "urgent", "high", "Critical"} {
+		if ValidPriority(p) {
+			t.Errorf("ValidPriority(%q) = true", p)
+		}
+	}
+}

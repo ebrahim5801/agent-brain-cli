@@ -16,6 +16,7 @@ type packItem struct {
 	content    string
 	kind       string
 	origin     string
+	priority   string
 	capturedAt string
 	branch     string
 	commit     string
@@ -51,19 +52,19 @@ func mergeRank(personal []store.Memory, team []store.TeamMemoryRow, cmp *gitstat
 func personalItem(e store.Memory, cmp *gitstate.Comparer, now time.Time) packItem {
 	f := cmp.Compare(e.Branch.String, e.CommitHash.String)
 	return packItem{
-		content: e.Content, kind: e.Kind, origin: e.Origin, capturedAt: e.CapturedAt,
+		content: e.Content, kind: e.Kind, origin: e.Origin, priority: e.Priority, capturedAt: e.CapturedAt,
 		branch: e.Branch.String, commit: e.CommitHash.String, id: e.ID,
-		freshness: f, score: originWeight(e.Origin) * freshnessWeight(f.Signal) * recencyDecay(e.CapturedAt, now),
+		freshness: f, score: entryScore(e.Priority, e.Origin, f.Signal, e.CapturedAt, now),
 	}
 }
 
 func teamItem(e store.TeamMemoryRow, cmp *gitstate.Comparer, now time.Time) packItem {
 	f := cmp.Compare(e.Branch, e.CommitHash)
 	return packItem{
-		content: e.Content, kind: e.Kind, origin: e.Origin, capturedAt: e.CapturedAt,
+		content: e.Content, kind: e.Kind, origin: e.Origin, priority: e.Priority, capturedAt: e.CapturedAt,
 		branch: e.Branch, commit: e.CommitHash,
 		isTeam: true, author: e.Author, authorFormer: e.AuthorFormer, contradicts: e.Contradicts != "", uid: e.UID,
-		freshness: f, score: originWeight(e.Origin) * freshnessWeight(f.Signal) * recencyDecay(e.CapturedAt, now),
+		freshness: f, score: entryScore(e.Priority, e.Origin, f.Signal, e.CapturedAt, now),
 	}
 }
 
@@ -89,7 +90,7 @@ func itemLess(a, b packItem) bool {
 // TeamList renders this project's active cached team entries, score-ordered,
 // for the merged MCP list. Empty when the project has no team pool.
 func TeamList(st *store.Store, projectID int64, dir string, gitBudget time.Duration, now time.Time) ([]string, error) {
-	lines, _, err := teamLines(st, projectID, dir, "", "", 0, gitBudget, now)
+	lines, _, err := teamLines(st, projectID, dir, "", Filter{}, 0, gitBudget, now)
 	return lines, err
 }
 
@@ -97,11 +98,11 @@ func TeamList(st *store.Store, projectID int64, dir string, gitBudget time.Durat
 // ranked by BM25 relevance scaled by the existing score boosts, for the
 // merged MCP search. The second return is the served entries' uids, in the
 // same order as lines, so the caller can record retrieval against them.
-func TeamSearch(st *store.Store, projectID int64, dir, query, kind string, limit int, gitBudget time.Duration, now time.Time) ([]string, []string, error) {
-	return teamLines(st, projectID, dir, query, kind, limit, gitBudget, now)
+func TeamSearch(st *store.Store, projectID int64, dir, query string, filter Filter, limit int, gitBudget time.Duration, now time.Time) ([]string, []string, error) {
+	return teamLines(st, projectID, dir, query, filter, limit, gitBudget, now)
 }
 
-func teamLines(st *store.Store, projectID int64, dir, query, kind string, limit int, gitBudget time.Duration, now time.Time) ([]string, []string, error) {
+func teamLines(st *store.Store, projectID int64, dir, query string, filter Filter, limit int, gitBudget time.Duration, now time.Time) ([]string, []string, error) {
 	team, err := st.ListTeamMemories(projectID)
 	if err != nil {
 		return nil, nil, err
@@ -114,7 +115,7 @@ func teamLines(st *store.Store, projectID int64, dir, query, kind string, limit 
 	var corpus []store.TeamMemoryRow
 	var docs [][]string
 	for _, e := range team {
-		if kind != "" && e.Kind != kind {
+		if !filter.matchesTeam(e) {
 			continue
 		}
 		corpus = append(corpus, e)
@@ -161,7 +162,7 @@ func teamLines(st *store.Store, projectID int64, dir, query, kind string, limit 
 // attribution and state.
 func renderItem(it packItem) string {
 	if !it.isTeam {
-		return renderPersonalLine(it.id, it.kind, it.origin, it.freshness.Render(), it.content)
+		return renderPersonalLine(it.id, it.kind, it.origin, it.priority, it.freshness.Render(), it.content)
 	}
 	var meta strings.Builder
 	meta.WriteString("team · ")
@@ -170,6 +171,9 @@ func renderItem(it packItem) string {
 		meta.WriteString(" (former member)")
 	}
 	meta.WriteString(" · ")
+	if tag := priorityTag(it.priority); tag != "" {
+		meta.WriteString(tag + " · ")
+	}
 	meta.WriteString(it.freshness.Render())
 	if it.contradicts {
 		meta.WriteString(" · CONTRADICTS another team entry")

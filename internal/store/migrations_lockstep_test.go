@@ -1,6 +1,9 @@
 package store
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 // TestMigrationSlicesLockstep guards the "append to both slices together" rule.
 // The Postgres baseline collapses SQLite versions 1..sqliteBaselineVersions into
@@ -58,6 +61,40 @@ func TestIdentityTablesTransferred(t *testing.T) {
 	for _, table := range identityTables {
 		if columnsFor(table) == nil {
 			t.Errorf("identity table %q missing from transferColumns — its rows would be lost on migration", table)
+		}
+	}
+}
+
+// TestTransferColumnsCoverSchema guards against a column added to a table by a
+// migration but forgotten in transferColumns: a storage switch would silently
+// drop it, taking the data with it.
+func TestTransferColumnsCoverSchema(t *testing.T) {
+	st, err := OpenAt(filepath.Join(t.TempDir(), "agent-brain.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	for _, spec := range transferColumns {
+		rows, err := st.DB.Query(`SELECT name FROM pragma_table_info(?)`, spec.table)
+		if err != nil {
+			t.Fatalf("table info %s: %v", spec.table, err)
+		}
+		declared := map[string]bool{}
+		for _, c := range spec.cols {
+			declared[c] = true
+		}
+		for rows.Next() {
+			var col string
+			if err := rows.Scan(&col); err != nil {
+				t.Fatal(err)
+			}
+			if !declared[col] {
+				t.Errorf("%s.%s missing from transferColumns — it would be dropped on a storage switch", spec.table, col)
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
 		}
 	}
 }

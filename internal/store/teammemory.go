@@ -3,6 +3,8 @@ package store
 import (
 	"database/sql"
 	"errors"
+
+	"github.com/ebrahim5801/agent-brain-cli/wire"
 )
 
 // ErrAmbiguousTeamHandle is returned when a rendered team handle prefix matches
@@ -20,6 +22,7 @@ type TeamMemoryRow struct {
 	Content      string
 	Kind         string
 	Origin       string
+	Priority     string
 	Status       string // active | superseded | deleted
 	Contradicts  string // uid of the conflicting entry, "" if none
 	Flagged      bool
@@ -28,6 +31,22 @@ type TeamMemoryRow struct {
 	CommitHash   string
 	CapturedAt   string
 	UpdatedAt    string
+}
+
+// priorityOrDefault normalizes a server-supplied priority. Empty is the
+// older-server case. A value outside the vocabulary is coerced rather than
+// stored: the Postgres client backend has a CHECK on the column, so storing one
+// would abort the whole ApplyPull transaction and every later pull would replay
+// the same batch and fail identically — a permanently stuck sync rather than a
+// degraded one. The server validates its own writers; this is the reader's side
+// of a boundary the client does not control.
+func priorityOrDefault(p string) string {
+	for _, valid := range wire.MemoryPriorities {
+		if p == valid {
+			return p
+		}
+	}
+	return MemoryPriorityNormal
 }
 
 // ApplyPull applies a batch of pulled entries to the cache in one transaction.
@@ -48,15 +67,16 @@ func (s *Store) ApplyPull(projectID int64, rows []TeamMemoryRow) error {
 		}
 		if _, err := s.ExecTx(tx, `
             INSERT INTO team_memories
-                (uid, project_id, author, author_former, content, kind, origin, status,
+                (uid, project_id, author, author_former, content, kind, origin, priority, status,
                  contradicts, flagged, mine, branch, commit_hash, captured_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(uid) DO UPDATE SET
                 author = excluded.author,
                 author_former = excluded.author_former,
                 content = excluded.content,
                 kind = excluded.kind,
                 origin = excluded.origin,
+                priority = excluded.priority,
                 status = excluded.status,
                 contradicts = excluded.contradicts,
                 flagged = excluded.flagged,
@@ -65,7 +85,7 @@ func (s *Store) ApplyPull(projectID int64, rows []TeamMemoryRow) error {
                 commit_hash = excluded.commit_hash,
                 captured_at = excluded.captured_at,
                 updated_at = excluded.updated_at`,
-			r.UID, projectID, r.Author, r.AuthorFormer, r.Content, r.Kind, r.Origin, r.Status,
+			r.UID, projectID, r.Author, r.AuthorFormer, r.Content, r.Kind, r.Origin, priorityOrDefault(r.Priority), r.Status,
 			nullIfEmpty(r.Contradicts), r.Flagged, r.Mine, nullIfEmpty(r.Branch), nullIfEmpty(r.CommitHash),
 			r.CapturedAt, r.UpdatedAt); err != nil {
 			return err
@@ -80,7 +100,7 @@ func (s *Store) ApplyPull(projectID int64, rows []TeamMemoryRow) error {
 // serving both would duplicate every line a sharing author writes.
 func (s *Store) ListTeamMemories(projectID int64) ([]TeamMemoryRow, error) {
 	rows, err := s.Query(`
-        SELECT uid, project_id, author, author_former, content, kind, origin, status,
+        SELECT uid, project_id, author, author_former, content, kind, origin, priority, status,
                COALESCE(contradicts, ''), flagged, mine,
                COALESCE(branch, ''), COALESCE(commit_hash, ''), captured_at, updated_at
         FROM team_memories
@@ -95,7 +115,7 @@ func (s *Store) ListTeamMemories(projectID int64) ([]TeamMemoryRow, error) {
 		var r TeamMemoryRow
 		var authorFormer, flagged, mine intBool
 		if err := rows.Scan(&r.UID, &r.ProjectID, &r.Author, &authorFormer, &r.Content, &r.Kind, &r.Origin,
-			&r.Status, &r.Contradicts, &flagged, &mine, &r.Branch, &r.CommitHash, &r.CapturedAt, &r.UpdatedAt); err != nil {
+			&r.Priority, &r.Status, &r.Contradicts, &flagged, &mine, &r.Branch, &r.CommitHash, &r.CapturedAt, &r.UpdatedAt); err != nil {
 			return nil, err
 		}
 		r.AuthorFormer, r.Flagged, r.Mine = bool(authorFormer), bool(flagged), bool(mine)

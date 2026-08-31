@@ -46,16 +46,17 @@ var transferColumns = []struct {
 	// captured), so the id-ordered copy satisfies the FK in one pass.
 	{"sessions", []string{"id", "external_id", "project_id", "assistant", "started_at", "ended_at", "end_reason", "model",
 		"input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "transcript_path",
-		"sync_uid", "synced_at", "sync_dirty", "memory_distilled_at", "summary", "parent_session_id", "agent_type", "agent_prompt"}},
+		"sync_uid", "synced_at", "sync_dirty", "memory_distilled_at", "memory_checkpointed_at", "memory_prompt_injected_at",
+		"sync_reject_count", "sync_retry_after", "summary", "parent_session_id", "agent_type", "agent_prompt"}},
 	{"events", []string{"id", "session_id", "kind", "detail", "occurred_at", "sync_uid", "synced_at"}},
 	{"session_model_usage", []string{"id", "session_id", "model", "input_tokens", "output_tokens",
 		"cache_read_tokens", "cache_write_tokens", "synced_at", "sync_dirty"}},
 	// memories is copied two-pass (superseded_by is a self-FK); see copyMemories.
-	{"memories", []string{"id", "project_id", "session_id", "content", "kind", "origin", "status", "superseded_by",
+	{"memories", []string{"id", "project_id", "session_id", "content", "kind", "origin", "priority", "status", "superseded_by",
 		"branch", "commit_hash", "captured_at", "updated_at", "edited", "personal_only", "team_uid", "shared_at", "share_error"}},
 	{"memory_usage_events", []string{"id", "session_id", "project_id", "scope", "memory_id", "team_uid",
 		"retrieved", "cited", "first_at", "last_at", "synced_at", "sync_dirty"}},
-	{"team_memories", []string{"uid", "project_id", "author", "author_former", "content", "kind", "origin", "status",
+	{"team_memories", []string{"uid", "project_id", "author", "author_former", "content", "kind", "origin", "priority", "status",
 		"contradicts", "flagged", "mine", "branch", "commit_hash", "captured_at", "updated_at"}},
 	{"team_sync_state", []string{"project_id", "pull_cursor", "endpoint"}},
 	{"memory_team_supersedes", []string{"memory_id", "team_uid"}},
@@ -394,7 +395,7 @@ func copyMemoriesWhere(src querier, dst *Store, cols []string, where string) (in
 func resetSequences(dst *Store) error {
 	for _, table := range identityTables {
 		if _, err := dst.Exec(
-			`SELECT setval(pg_get_serial_sequence(?, 'id'), (SELECT COALESCE(MAX(id), 1) FROM ` + table + `))`,
+			`SELECT setval(pg_get_serial_sequence(?, 'id'), (SELECT COALESCE(MAX(id), 1) FROM `+table+`))`,
 			table); err != nil {
 			return fmt.Errorf("reset %s sequence: %w", table, err)
 		}

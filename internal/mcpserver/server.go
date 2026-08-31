@@ -108,6 +108,7 @@ type saveIn struct {
 	Content        string   `json:"content" jsonschema:"The fact/decision/convention/task state to remember, self-contained and concise. Max 4000 characters."`
 	Kind           string   `json:"kind" jsonschema:"One of: decision, convention, task_state, fact."`
 	Origin         string   `json:"origin" jsonschema:"explicit when the developer asked for this to be remembered, auto otherwise."`
+	Priority       string   `json:"priority,omitempty" jsonschema:"How hard this entry should compete for the limited session-start memory budget. Default normal; omit unless one of the others clearly fits. critical: blocks work or will silently cause harm if forgotten — an unfixed P0, a broken invariant, a decision that must not be re-litigated, a trap that already cost time once; expect this to be rare, a handful of entries per project at a time. normal: durable context worth carrying forward. background: true and worth keeping, but the first thing to cut when the budget is tight — historical detail, superseded rationale, one-off observations."`
 	Supersedes     []int64  `json:"supersedes,omitempty" jsonschema:"IDs of active personal entries (shown as [#id]) this replaces (contradicted or outdated)."`
 	SupersedesTeam []string `json:"supersedes_team,omitempty" jsonschema:"Handles of team entries (shown as [team#...]) this replaces or contradicts. A same-author entry is superseded; a teammate's becomes a flagged contradiction."`
 	PersonalOnly   bool     `json:"personal_only,omitempty" jsonschema:"Set true for personal context that should stay on this machine and never be shared to the team pool, even on a team project."`
@@ -128,6 +129,7 @@ func (s *Server) save(ctx context.Context, req *mcp.CallToolRequest, in saveIn) 
 		Content:        in.Content,
 		Kind:           in.Kind,
 		Origin:         in.Origin,
+		Priority:       in.Priority,
 		Supersedes:     in.Supersedes,
 		SupersedesTeam: in.SupersedesTeam,
 		PersonalOnly:   in.PersonalOnly,
@@ -189,9 +191,10 @@ func (s *Server) sessionSummary(ctx context.Context, req *mcp.CallToolRequest, i
 }
 
 type searchIn struct {
-	Query string `json:"query,omitempty" jsonschema:"Keywords to match; empty returns most recent."`
-	Kind  string `json:"kind,omitempty" jsonschema:"Narrow to one kind: decision, convention, task_state, or fact."`
-	Limit int    `json:"limit,omitempty" jsonschema:"Maximum entries to return, 1-50; default 10."`
+	Query    string `json:"query,omitempty" jsonschema:"Keywords to match; empty returns most recent."`
+	Kind     string `json:"kind,omitempty" jsonschema:"Narrow to one kind: decision, convention, task_state, or fact."`
+	Priority string `json:"priority,omitempty" jsonschema:"Narrow to one priority: critical, normal, or background."`
+	Limit    int    `json:"limit,omitempty" jsonschema:"Maximum entries to return, 1-50; default 10."`
 }
 
 func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in searchIn) (*mcp.CallToolResult, any, error) {
@@ -209,8 +212,13 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in search
 	if limit > 50 {
 		limit = 50
 	}
+	if in.Priority != "" && !memory.ValidPriority(in.Priority) {
+		return nil, nil, fmt.Errorf("unknown priority %q; want one of: %s",
+			in.Priority, strings.Join(memory.Priorities, ", "))
+	}
+	filter := memory.Filter{Kind: in.Kind, Priority: in.Priority}
 	now := time.Now()
-	ranked, err := memory.Search(s.st, projectID, s.dir, in.Query, in.Kind, limit, gitBudget, now)
+	ranked, err := memory.Search(s.st, projectID, s.dir, in.Query, filter, limit, gitBudget, now)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -222,7 +230,7 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in search
 	var teamLines []string
 	if remaining := limit - len(ranked); remaining > 0 {
 		var teamUIDs []string
-		teamLines, teamUIDs, err = memory.TeamSearch(s.st, projectID, s.dir, in.Query, in.Kind, remaining, gitBudget, now)
+		teamLines, teamUIDs, err = memory.TeamSearch(s.st, projectID, s.dir, in.Query, filter, remaining, gitBudget, now)
 		if err != nil {
 			return nil, nil, err
 		}

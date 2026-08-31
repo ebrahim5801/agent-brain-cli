@@ -182,6 +182,13 @@ ALTER TABLE sessions ADD COLUMN sync_reject_count BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE sessions ADD COLUMN sync_retry_after TEXT;
 CREATE INDEX idx_sessions_sync_retry ON sessions(sync_retry_after) WHERE sync_retry_after IS NOT NULL;
 `,
+	`
+ALTER TABLE memories ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'
+    CHECK (priority IN ('critical','normal','background'));
+ALTER TABLE team_memories ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'
+    CHECK (priority IN ('critical','normal','background'));
+CREATE INDEX idx_memories_priority ON memories(project_id, priority) WHERE status = 'active';
+`,
 }
 
 // identityTables lists the tables whose id is a generated identity column, in
