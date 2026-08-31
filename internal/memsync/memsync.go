@@ -217,6 +217,7 @@ func (e *Engine) contributeProject(st *store.Store, cfg *config.Config, p linked
 				Content:    content,
 				Kind:       m.Kind,
 				Origin:     m.Origin,
+				Priority:   m.Priority,
 				CapturedAt: isoToRFC3339(m.CapturedAt),
 				Branch:     m.Branch.String,
 				CommitHash: m.CommitHash.String,
@@ -370,7 +371,7 @@ func (e *Engine) pullProject(st *store.Store, cfg *config.Config, p linkedProjec
 		for _, e := range resp.Entries {
 			rows = append(rows, store.TeamMemoryRow{
 				UID: e.UID, ProjectID: p.projectID, Author: e.Author, AuthorFormer: e.AuthorFormer,
-				Content: e.Content, Kind: e.Kind, Origin: e.Origin, Status: e.Status,
+				Content: e.Content, Kind: e.Kind, Origin: e.Origin, Priority: e.Priority, Status: e.Status,
 				Contradicts: e.ContradictsUID, Flagged: e.Flagged, Mine: e.Mine,
 				Branch: e.Branch, CommitHash: e.CommitHash,
 				CapturedAt: rfc3339ToISO(e.CapturedAt), UpdatedAt: rfc3339ToISO(e.UpdatedAt),

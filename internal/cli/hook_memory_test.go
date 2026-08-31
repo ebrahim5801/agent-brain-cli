@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ebrahim5801/agent-brain-cli/internal/memory"
@@ -134,5 +136,45 @@ func TestRecordCitationsGracefulWithoutScanner(t *testing.T) {
 	}
 	if cited != 0 {
 		t.Errorf("cited = %d, want 0 (gemini-cli has no CitationScanner)", cited)
+	}
+}
+
+// The injected prompts are the only thing that reaches the auto-save path, so a
+// priority the model never hears about would leave every distilled entry at the
+// default. Both prompts carry it: a checkpoint save is a real save.
+func TestInjectedPromptsCarryPriority(t *testing.T) {
+	for name, prompt := range map[string]string{
+		"distillation": distillationReason,
+		"checkpoint":   checkpointReason,
+	} {
+		for _, must := range []string{"priority", "critical", "background"} {
+			if !strings.Contains(prompt, must) {
+				t.Errorf("%s prompt missing %q", name, must)
+			}
+		}
+	}
+}
+
+// contracts/session-injection.md quotes the Stop prompt verbatim. It had already
+// drifted from the code once; nothing but this test would catch it again.
+func TestSessionInjectionContractMatchesPrompt(t *testing.T) {
+	// specs/ is private and absent from the extracted public CLI tree, where
+	// this guard has nothing to guard. Skip only on that whole-tree signal — a
+	// missing file while specs/ exists is the drift this test is here to catch.
+	if _, err := os.Stat(filepath.Join("..", "..", "specs")); os.IsNotExist(err) {
+		t.Skip("specs/ not present (public CLI tree); contract lives in the private repo")
+	}
+	path := filepath.Join("..", "..", "specs", "003-personal-memory-mcp", "contracts", "session-injection.md")
+	doc, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The doc quotes the prompt inside a JSON payload, so compare the JSON form.
+	quoted, err := json.Marshal(distillationReason)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(doc), string(quoted)) {
+		t.Errorf("%s no longer quotes distillationReason verbatim; update it with the current prompt", path)
 	}
 }

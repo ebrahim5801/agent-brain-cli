@@ -19,7 +19,16 @@ import (
 
 const MaxContentLen = 4000
 
-var Kinds = wire.MemoryKinds
+var (
+	Kinds      = wire.MemoryKinds
+	Priorities = wire.MemoryPriorities
+)
+
+const (
+	PriorityCritical   = wire.MemoryPriorityCritical
+	PriorityNormal     = wire.MemoryPriorityNormal
+	PriorityBackground = wire.MemoryPriorityBackground
+)
 
 const (
 	OriginAuto     = "auto"
@@ -31,15 +40,20 @@ var (
 	ErrContentTooLong = fmt.Errorf("content exceeds %d characters", MaxContentLen)
 	ErrBadKind        = fmt.Errorf("kind must be one of: %s", strings.Join(Kinds, ", "))
 	ErrBadOrigin      = errors.New(`origin must be "auto" or "explicit"`)
+	ErrBadPriority    = fmt.Errorf("priority must be one of: %s", strings.Join(Priorities, ", "))
 )
 
 type SaveInput struct {
-	ProjectID  int64
-	SessionID  int64 // 0 when outside a tracked session
-	Dir        string
-	Content    string
-	Kind       string
-	Origin     string
+	ProjectID int64
+	SessionID int64 // 0 when outside a tracked session
+	Dir       string
+	Content   string
+	Kind      string
+	Origin    string
+	// Priority governs how hard the entry competes for the session-start pack
+	// budget. Empty normalizes to "normal" so a caller that does not classify
+	// is never forced to; an unrecognized value is ErrBadPriority.
+	Priority   string
 	Supersedes []int64
 	// SupersedesTeam holds handles of cached team entries this save replaces or
 	// contradicts (as rendered in the pack, e.g. "team#abc12345"). Each is mapped
@@ -75,6 +89,10 @@ func Save(st *store.Store, in SaveInput) (SaveResult, error) {
 	if in.Origin != OriginAuto && in.Origin != OriginExplicit {
 		return SaveResult{}, ErrBadOrigin
 	}
+	priority, ok := normalizePriority(in.Priority)
+	if !ok {
+		return SaveResult{}, ErrBadPriority
+	}
 	content := strings.TrimSpace(redact.Apply(stripToolArtifacts(in.Content)))
 	if content == "" {
 		return SaveResult{}, ErrEmptyContent
@@ -91,6 +109,7 @@ func Save(st *store.Store, in SaveInput) (SaveResult, error) {
 		Content:      content,
 		Kind:         in.Kind,
 		Origin:       in.Origin,
+		Priority:     priority,
 		Branch:       gs.Branch,
 		Commit:       gs.Commit,
 		HasRepo:      gs.HasRepo,
@@ -184,6 +203,47 @@ func Edit(st *store.Store, id int64, content string) error {
 		return ErrContentTooLong
 	}
 	return st.UpdateMemoryContent(id, content, store.Now())
+}
+
+// SetPriority reclassifies an existing entry. An empty priority is rejected
+// here rather than normalized: on the save path empty means "did not classify",
+// but a reclassification command with no value is a mistake, not a default.
+func SetPriority(st *store.Store, id int64, priority string) error {
+	if priority == "" {
+		return ErrBadPriority
+	}
+	p, ok := normalizePriority(priority)
+	if !ok {
+		return ErrBadPriority
+	}
+	return st.UpdateMemoryPriority(id, p, store.Now())
+}
+
+// ValidPriority reports whether p is in the vocabulary. Callers that filter
+// rather than write use it to reject a typo up front: a filter on a value that
+// cannot exist returns an empty result, which reads as "this project has no
+// critical entries" rather than as a mistake.
+func ValidPriority(p string) bool {
+	for _, valid := range Priorities {
+		if p == valid {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizePriority maps an empty priority to the default and reports whether
+// the value is in the vocabulary.
+func normalizePriority(p string) (string, bool) {
+	if p == "" {
+		return PriorityNormal, true
+	}
+	for _, valid := range Priorities {
+		if p == valid {
+			return p, true
+		}
+	}
+	return "", false
 }
 
 func validKind(kind string) bool {

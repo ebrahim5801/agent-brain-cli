@@ -42,10 +42,14 @@ type MemoryContributeRequest struct {
 }
 
 type MemoryContributeEntry struct {
-	UID        string `json:"uid"`
-	Content    string `json:"content"`
-	Kind       string `json:"kind"`
-	Origin     string `json:"origin"`
+	UID     string `json:"uid"`
+	Content string `json:"content"`
+	Kind    string `json:"kind"`
+	Origin  string `json:"origin"`
+	// Priority is the author's classification of how hard the entry should
+	// compete for a reader's session-start budget. Empty means "normal": an
+	// older client sends nothing, and the server stores the default.
+	Priority   string `json:"priority,omitempty"`
 	CapturedAt string `json:"captured_at"`
 	Branch     string `json:"branch,omitempty"`
 	CommitHash string `json:"commit_hash,omitempty"`
@@ -100,6 +104,7 @@ type MemoryPullEntry struct {
 	Content        string `json:"content"` // "" when status = "deleted"
 	Kind           string `json:"kind"`
 	Origin         string `json:"origin"`
+	Priority       string `json:"priority,omitempty"`
 	Status         string `json:"status"` // active | superseded | deleted
 	ContradictsUID string `json:"contradicts_uid,omitempty"`
 	Flagged        bool   `json:"flagged"`
@@ -114,3 +119,16 @@ type MemoryPullEntry struct {
 // MemoryKinds is the canonical memory-kind vocabulary, in canonical order.
 // It lives here because both sides of the wire order entries by it.
 var MemoryKinds = []string{"decision", "convention", "task_state", "fact"}
+
+// MemoryPriorities is the canonical priority vocabulary, ordered strongest
+// first. It lives here for the same reason MemoryKinds does: both sides of the
+// wire validate against it. An entry's priority governs how hard it competes
+// for the session-start memory budget; "normal" is the default and the value an
+// empty field normalizes to.
+var MemoryPriorities = []string{MemoryPriorityCritical, MemoryPriorityNormal, MemoryPriorityBackground}
+
+const (
+	MemoryPriorityCritical   = "critical"
+	MemoryPriorityNormal     = "normal"
+	MemoryPriorityBackground = "background"
+)

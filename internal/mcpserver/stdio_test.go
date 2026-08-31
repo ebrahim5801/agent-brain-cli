@@ -2,9 +2,11 @@ package mcpserver_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -101,5 +103,46 @@ func TestStdioToolCallRoundTrips(t *testing.T) {
 	}
 	if len(out.Content) == 0 {
 		t.Fatal("memory_search returned no content; assistants would see an empty result")
+	}
+}
+
+// The schema description is the entire calibration mechanism for priority: the
+// model has nothing else to go on when deciding whether an entry is critical.
+// Unit tests exercise the handler struct directly and would not notice the
+// field failing to reach the wire schema at all.
+func TestStdioSchemaCarriesPriority(t *testing.T) {
+	session := stdioSession(t)
+	res, err := session.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("tools/list: %v", err)
+	}
+	for _, tool := range res.Tools {
+		if tool.Name != "memory_save" && tool.Name != "memory_search" {
+			continue
+		}
+		raw, err := json.Marshal(tool.InputSchema)
+		if err != nil {
+			t.Fatalf("%s schema: %v", tool.Name, err)
+		}
+		var schema struct {
+			Properties map[string]struct {
+				Description string `json:"description"`
+			} `json:"properties"`
+		}
+		if err := json.Unmarshal(raw, &schema); err != nil {
+			t.Fatalf("%s schema: %v", tool.Name, err)
+		}
+		prop, ok := schema.Properties["priority"]
+		if !ok {
+			t.Errorf("%s schema has no priority property", tool.Name)
+			continue
+		}
+		if tool.Name == "memory_save" {
+			for _, must := range []string{"critical", "normal", "background", "rare"} {
+				if !strings.Contains(prop.Description, must) {
+					t.Errorf("memory_save priority description missing %q: %q", must, prop.Description)
+				}
+			}
+		}
 	}
 }

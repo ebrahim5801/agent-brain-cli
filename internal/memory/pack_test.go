@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ebrahim5801/agent-brain-cli/internal/store"
 )
 
 func TestBuildPackEmptyProject(t *testing.T) {
@@ -216,5 +218,86 @@ func TestBuildPackExcludesSuperseded(t *testing.T) {
 	}
 	if !strings.Contains(pack.Text, "new truth") {
 		t.Error("active entry missing from pack")
+	}
+}
+
+func TestPackRendersPriorityOnlyWhenNotNormal(t *testing.T) {
+	st, projectID := openStore(t)
+	dir := t.TempDir()
+
+	crit, err := Save(st, SaveInput{ProjectID: projectID, Dir: dir, Content: "sync is broken",
+		Kind: "task_state", Origin: OriginAuto, Priority: PriorityCritical})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bg, err := Save(st, SaveInput{ProjectID: projectID, Dir: dir, Content: "old rationale",
+		Kind: "fact", Origin: OriginAuto, Priority: PriorityBackground})
+	if err != nil {
+		t.Fatal(err)
+	}
+	norm, err := Save(st, SaveInput{ProjectID: projectID, Dir: dir, Content: "routine detail",
+		Kind: "fact", Origin: OriginAuto})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pack, err := BuildPack(st, projectID, dir, 0, 0, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"[#" + strconv.FormatInt(crit.ID, 10) + "] (task_state, auto, critical, unknown: no git state)",
+		"[#" + strconv.FormatInt(bg.ID, 10) + "] (fact, auto, background, unknown: no git state)",
+		"[#" + strconv.FormatInt(norm.ID, 10) + "] (fact, auto, unknown: no git state)",
+	} {
+		if !strings.Contains(pack.Text, want) {
+			t.Errorf("pack missing %q in:\n%s", want, pack.Text)
+		}
+	}
+	if strings.Contains(pack.Text, ", normal,") {
+		t.Error("pack rendered the default priority")
+	}
+}
+
+// The point of the feature: a months-old critical entry that the recency decay
+// would have pushed out of the budget is served, ahead of newer normal entries
+// competing for the same space. The comparison is against two-week-old normal
+// entries, not brand-new ones: the floor is 0.35, so a floored critical scores
+// 0.70 against a two-week normal's 0.50 — today's work still ranks first.
+func TestPackServesAgedCriticalOverFreshNormal(t *testing.T) {
+	st, projectID := openStore(t)
+	dir := t.TempDir()
+	now := time.Now()
+
+	crit, err := Save(st, SaveInput{ProjectID: projectID, Dir: dir, Content: strings.Repeat("c", 400),
+		Kind: "task_state", Origin: OriginAuto, Priority: PriorityCritical})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.DB.Exec(st.Rebind(`UPDATE memories SET captured_at = ? WHERE id = ?`),
+		now.Add(-120*24*time.Hour).Format(store.TimeLayout), crit.ID); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 10; i++ {
+		res, err := Save(st, SaveInput{ProjectID: projectID, Dir: dir, Content: strings.Repeat("n", 400),
+			Kind: "fact", Origin: OriginAuto})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.DB.Exec(st.Rebind(`UPDATE memories SET captured_at = ? WHERE id = ?`),
+			now.Add(-14*24*time.Hour).Format(store.TimeLayout), res.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	pack, err := BuildPack(st, projectID, dir, 500, 0, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(pack.Text, "[#"+strconv.FormatInt(crit.ID, 10)+"]") {
+		t.Errorf("aged critical entry was cut from the pack:\n%s", pack.Text)
+	}
+	if n := strings.Count(pack.Text, "[#"); n >= 11 {
+		t.Fatalf("budget did not bind: %d entries served", n)
 	}
 }

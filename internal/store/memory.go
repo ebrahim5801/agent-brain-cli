@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+
+	"github.com/ebrahim5801/agent-brain-cli/wire"
 )
 
 // Memory lifecycle: active | superseded | deleted. Every transition is soft and
@@ -26,6 +28,7 @@ type Memory struct {
 	Content      string
 	Kind         string
 	Origin       string
+	Priority     string
 	Status       string
 	SupersededBy sql.NullInt64
 	Branch       sql.NullString
@@ -37,13 +40,22 @@ type Memory struct {
 
 var ErrMemoryNotFound = errors.New("memory entry not found")
 
-const memoryColumns = `id, project_id, session_id, content, kind, origin, status, superseded_by, branch, commit_hash, captured_at, updated_at, edited`
+// The priority vocabulary is defined once, in wire, because both sides of the
+// team-sync wire validate against it. These aliases exist so store callers need
+// not spell the literals; a rename in wire must not leave a second copy here.
+const (
+	MemoryPriorityCritical   = wire.MemoryPriorityCritical
+	MemoryPriorityNormal     = wire.MemoryPriorityNormal
+	MemoryPriorityBackground = wire.MemoryPriorityBackground
+)
+
+const memoryColumns = `id, project_id, session_id, content, kind, origin, priority, status, superseded_by, branch, commit_hash, captured_at, updated_at, edited`
 
 func scanMemory(row interface{ Scan(...any) error }) (Memory, error) {
 	var m Memory
 	var edited intBool
 	err := row.Scan(&m.ID, &m.ProjectID, &m.SessionID, &m.Content, &m.Kind, &m.Origin,
-		&m.Status, &m.SupersededBy, &m.Branch, &m.CommitHash, &m.CapturedAt, &m.UpdatedAt, &edited)
+		&m.Priority, &m.Status, &m.SupersededBy, &m.Branch, &m.CommitHash, &m.CapturedAt, &m.UpdatedAt, &edited)
 	m.Edited = bool(edited)
 	return m, err
 }
@@ -54,6 +66,7 @@ type NewMemory struct {
 	Content   string
 	Kind      string
 	Origin    string
+	Priority  string
 	Branch    string // "" = detached or no repo
 	Commit    string // "" = no repo
 	HasRepo   bool
@@ -79,14 +92,18 @@ func (s *Store) InsertMemory(m NewMemory, at string) (int64, error) {
 	if m.ShareLive && !m.PersonalOnly {
 		teamUID = uuid.NewString()
 	}
+	priority := m.Priority
+	if priority == "" {
+		priority = MemoryPriorityNormal
+	}
 	// RETURNING id unifies both backends (modernc.org/sqlite supports it), so
 	// this path has no LastInsertId() divergence to special-case per dialect.
 	var id int64
 	err := s.QueryRow(`
-        INSERT INTO memories (project_id, session_id, content, kind, origin, branch, commit_hash, captured_at, updated_at, personal_only, team_uid)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO memories (project_id, session_id, content, kind, origin, priority, branch, commit_hash, captured_at, updated_at, personal_only, team_uid)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id`,
-		m.ProjectID, sessionID, m.Content, m.Kind, m.Origin, branch, commit, at, at, m.PersonalOnly, teamUID).Scan(&id)
+		m.ProjectID, sessionID, m.Content, m.Kind, m.Origin, priority, branch, commit, at, at, m.PersonalOnly, teamUID).Scan(&id)
 	return id, err
 }
 
@@ -96,6 +113,7 @@ type PendingMemory struct {
 	Content    string
 	Kind       string
 	Origin     string
+	Priority   string
 	CapturedAt string
 	Branch     sql.NullString
 	CommitHash sql.NullString
@@ -120,8 +138,8 @@ func (s *Store) PendingContributions(projectID int64) ([]PendingMemory, error) {
 		agg = "string_agg(u, ',')"
 	}
 	rows, err := s.Query(`
-        SELECT m.team_uid, m.content, m.kind, m.origin, m.captured_at, m.branch, m.commit_hash,
-               (SELECT ` + agg + ` FROM (
+        SELECT m.team_uid, m.content, m.kind, m.origin, m.priority, m.captured_at, m.branch, m.commit_hash,
+               (SELECT `+agg+` FROM (
                     SELECT old.team_uid AS u FROM memories old
                       WHERE old.superseded_by = m.id AND old.team_uid IS NOT NULL
                     UNION
@@ -140,7 +158,7 @@ func (s *Store) PendingContributions(projectID int64) ([]PendingMemory, error) {
 	for rows.Next() {
 		var p PendingMemory
 		var supersedes sql.NullString
-		if err := rows.Scan(&p.UID, &p.Content, &p.Kind, &p.Origin, &p.CapturedAt, &p.Branch, &p.CommitHash, &supersedes); err != nil {
+		if err := rows.Scan(&p.UID, &p.Content, &p.Kind, &p.Origin, &p.Priority, &p.CapturedAt, &p.Branch, &p.CommitHash, &supersedes); err != nil {
 			return nil, err
 		}
 		if supersedes.Valid && supersedes.String != "" {
@@ -268,6 +286,53 @@ func (s *Store) ListMemories(projectID int64, includeSuperseded bool) ([]Memory,
 
 func (s *Store) UpdateMemoryContent(id int64, content, at string) error {
 	res, err := s.Exec(`UPDATE memories SET content = ?, edited = 1, updated_at = ? WHERE id = ?`, content, at, id)
+	return oneRow(res, err)
+}
+
+// MemoryPriorityCounts returns the project's active entries per priority. It
+// backs the calibration check: self-assigned priority is only useful while
+// critical stays rare, and the share is the only way to notice that it has not.
+func (s *Store) MemoryPriorityCounts(projectID int64) (map[string]int, error) {
+	rows, err := s.Query(`
+        SELECT priority, COUNT(*) FROM memories
+        WHERE project_id = ? AND status = 'active'
+        GROUP BY priority`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var priority string
+		var n int
+		if err := rows.Scan(&priority, &n); err != nil {
+			return nil, err
+		}
+		out[priority] += n
+	}
+	return out, rows.Err()
+}
+
+// MemoryShared reports whether an entry has already been contributed to the
+// team pool. A reclassification after that point is local only: the pool copy
+// keeps the priority it was contributed with.
+func (s *Store) MemoryShared(id int64) (bool, error) {
+	var sharedAt sql.NullString
+	err := s.QueryRow(`SELECT shared_at FROM memories WHERE id = ?`, id).Scan(&sharedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrMemoryNotFound
+	}
+	if err != nil {
+		return false, err
+	}
+	return sharedAt.Valid, nil
+}
+
+// UpdateMemoryPriority reclassifies an entry. It does not set edited: that flag
+// marks content the developer rewrote, and priority is classification, not
+// content.
+func (s *Store) UpdateMemoryPriority(id int64, priority, at string) error {
+	res, err := s.Exec(`UPDATE memories SET priority = ?, updated_at = ? WHERE id = ?`, priority, at, id)
 	return oneRow(res, err)
 }
 

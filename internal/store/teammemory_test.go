@@ -122,3 +122,40 @@ func TestDropTeamCache(t *testing.T) {
 		t.Errorf("cursor not reset: %q", cursor)
 	}
 }
+
+// A server outside this client's control can send a priority this build does
+// not know. Storing it would abort ApplyPull on the Postgres backend, whose
+// CHECK rejects it, and every later pull would replay the same batch and fail
+// identically — a permanently stuck sync. It must be coerced instead.
+func TestApplyPullCoercesUnknownPriority(t *testing.T) {
+	st, projectID := openTeamStore(t)
+	at := Now()
+	rows := []TeamMemoryRow{
+		{UID: "u-unknown", Author: "a@example.com", Content: "from a newer server", Kind: "fact",
+			Origin: "auto", Priority: "urgent", Status: "active", CapturedAt: at, UpdatedAt: at},
+		{UID: "u-empty", Author: "a@example.com", Content: "from an older server", Kind: "fact",
+			Origin: "auto", Priority: "", Status: "active", CapturedAt: at, UpdatedAt: at},
+		{UID: "u-known", Author: "a@example.com", Content: "well formed", Kind: "fact",
+			Origin: "auto", Priority: MemoryPriorityCritical, Status: "active", CapturedAt: at, UpdatedAt: at},
+	}
+	if err := st.ApplyPull(projectID, rows); err != nil {
+		t.Fatalf("ApplyPull: %v", err)
+	}
+	cached, err := st.ListTeamMemories(projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, r := range cached {
+		got[r.UID] = r.Priority
+	}
+	if got["u-unknown"] != MemoryPriorityNormal {
+		t.Errorf("unknown priority stored as %q, want %q", got["u-unknown"], MemoryPriorityNormal)
+	}
+	if got["u-empty"] != MemoryPriorityNormal {
+		t.Errorf("empty priority stored as %q", got["u-empty"])
+	}
+	if got["u-known"] != MemoryPriorityCritical {
+		t.Errorf("valid priority not preserved: %q", got["u-known"])
+	}
+}

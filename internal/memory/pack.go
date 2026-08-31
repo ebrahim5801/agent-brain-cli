@@ -20,7 +20,8 @@ This is the authoritative project memory: before acting on any task, call
 memory_search with the task's keywords — do not rely on other memory files
 or re-derive from code what these entries already answer.
 Trust entries marked current; verify entries marked moved-on/different-branch/unverifiable
-against the code before relying on them. Use the agent-brain-memory MCP tools:
+against the code before relying on them. An entry marked critical is load-bearing:
+act on it or explicitly retire it by superseding it, rather than merely noting it. Use the agent-brain-memory MCP tools:
 memory_search to retrieve more, memory_save to record new durable context
 (pass supersedes:[id] when a personal entry below is outdated; to replace or
 contradict a team entry, pass its team#handle to supersedes_team).
@@ -44,12 +45,25 @@ memory_save). When you rely on an entry, restate its gist alongside the id
 // RenderEntry is the standard serving format shared by the pack, search, and
 // list (contracts/mcp-memory.md): [#<id>] (<kind>, <origin>, <freshness>) <content>
 func RenderEntry(r Ranked) string {
-	return renderPersonalLine(r.Entry.ID, r.Entry.Kind, r.Entry.Origin, r.Freshness.Render(), r.Entry.Content)
+	return renderPersonalLine(r.Entry.ID, r.Entry.Kind, r.Entry.Origin, r.Entry.Priority, r.Freshness.Render(), r.Entry.Content)
+}
+
+// priorityTag is the rendered priority, empty for "normal". Serving the default
+// on every line would cost tokens on the common case and dilute the signal
+// exactly where it matters.
+func priorityTag(priority string) string {
+	if priority == PriorityNormal || priority == "" {
+		return ""
+	}
+	return priority
 }
 
 // renderPersonalLine is the single definition of the personal serving line,
 // used by both the MCP results and the merged pack.
-func renderPersonalLine(id int64, kind, origin, freshness, content string) string {
+func renderPersonalLine(id int64, kind, origin, priority, freshness, content string) string {
+	if tag := priorityTag(priority); tag != "" {
+		return fmt.Sprintf("[#%d] (%s, %s, %s, %s) %s", id, kind, origin, tag, freshness, content)
+	}
 	return fmt.Sprintf("[#%d] (%s, %s, %s) %s", id, kind, origin, freshness, content)
 }
 

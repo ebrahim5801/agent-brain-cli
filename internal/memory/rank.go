@@ -8,9 +8,42 @@ import (
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
 )
 
-// R5 ranking: score = origin weight × freshness weight × recency decay.
-// Deterministic and transparent — no retrieval infrastructure at this scale.
+// R5 ranking: score = priority weight × origin weight × freshness weight ×
+// recency decay. Deterministic and transparent — no retrieval infrastructure at
+// this scale.
 const recencyHalfLife = 14 * 24 * time.Hour
+
+// criticalDecayFloor bounds how far a critical entry's recency term can fall.
+// Without it a critical entry still ages out (2× of 0.012 at three months is
+// still nothing); with it, its worst case is roughly a two-week-old normal
+// entry's score, permanently. It stops aging out without becoming unrankable,
+// so fresher critical work still outranks stale critical work.
+const criticalDecayFloor = 0.35
+
+func priorityWeight(p string) float64 {
+	switch p {
+	case PriorityCritical:
+		return 2.0
+	case PriorityBackground:
+		return 0.5
+	default: // normal, and anything written before the column existed
+		return 1.0
+	}
+}
+
+func priorityDecayFloor(p string) float64 {
+	if p == PriorityCritical {
+		return criticalDecayFloor
+	}
+	return 0
+}
+
+// entryScore is the single definition of the ranking formula, shared by Rank
+// and by the merged personal+team pack items.
+func entryScore(priority, origin string, sig gitstate.Signal, capturedAt string, now time.Time) float64 {
+	return priorityWeight(priority) * originWeight(origin) * freshnessWeight(sig) *
+		math.Max(recencyDecay(capturedAt, now), priorityDecayFloor(priority))
+}
 
 func originWeight(origin string) float64 {
 	if origin == OriginExplicit {
@@ -58,7 +91,7 @@ func Rank(entries []store.Memory, cmp *gitstate.Comparer, now time.Time) []Ranke
 	ranked := make([]Ranked, 0, len(entries))
 	for _, e := range entries {
 		f := cmp.Compare(e.Branch.String, e.CommitHash.String)
-		score := originWeight(e.Origin) * freshnessWeight(f.Signal) * recencyDecay(e.CapturedAt, now)
+		score := entryScore(e.Priority, e.Origin, f.Signal, e.CapturedAt, now)
 		ranked = append(ranked, Ranked{Entry: e, Freshness: f, Score: score})
 	}
 	sortRanked(ranked)

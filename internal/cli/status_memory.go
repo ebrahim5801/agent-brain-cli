@@ -53,9 +53,35 @@ func printMemoryStatus(st *store.Store) {
 		}
 	}
 	fmt.Printf("Memory:           %s\n", state)
-
 	if found {
+		printMemoryPriorityMix(st, projectID)
 		printTeamMemoryStatus(st, cfg, projectID)
+	}
+}
+
+// criticalShareCeiling is the share of active entries above which the critical
+// label has stopped meaning anything. Nothing enforces it — the point is to
+// make miscalibration visible before it is worth building a pack quota for.
+const criticalShareCeiling = 0.10
+
+func printMemoryPriorityMix(st *store.Store, projectID int64) {
+	counts, err := st.MemoryPriorityCounts(projectID)
+	if err != nil {
+		return
+	}
+	total := 0
+	for _, n := range counts {
+		total += n
+	}
+	critical, background := counts[store.MemoryPriorityCritical], counts[store.MemoryPriorityBackground]
+	if total == 0 || (critical == 0 && background == 0) {
+		return
+	}
+	fmt.Printf("                  priority: %d critical, %d normal, %d background\n",
+		critical, counts[store.MemoryPriorityNormal], background)
+	if share := float64(critical) / float64(total); share > criticalShareCeiling {
+		fmt.Printf("                  %.0f%% of entries are critical — the label is losing its meaning; review with `agent-brain memory list --critical`\n",
+			share*100)
 	}
 }
 
