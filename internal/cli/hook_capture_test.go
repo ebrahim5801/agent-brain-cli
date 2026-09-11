@@ -175,6 +175,7 @@ func TestInjectionPackParityAcrossAssistants(t *testing.T) {
 		"copilot-cli": `{"sessionId":"s","cwd":"` + proj + `"}`,
 		"gemini-cli":  `{"session_id":"s","cwd":"` + proj + `"}`,
 		"claude-code": `{"session_id":"s","cwd":"` + proj + `"}`,
+		"codex":       `{"session_id":"s","cwd":"` + proj + `"}`,
 	}
 	var packs []string
 	for name, payload := range starts {
@@ -439,6 +440,11 @@ func TestDistillationFiresOncePerAssistant(t *testing.T) {
 			`{"session_id":"d","cwd":"%s"}`,
 			`{"session_id":"d","cwd":"%s"}`,
 			`{"session_id":"d","cwd":"%s","tool_name":"edit"}`,
+			`{"session_id":"d","cwd":"%s"}`},
+		{"codex",
+			`{"session_id":"d","cwd":"%s"}`,
+			`{"session_id":"d","cwd":"%s"}`,
+			`{"session_id":"d","cwd":"%s","tool_name":"Bash"}`,
 			`{"session_id":"d","cwd":"%s"}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
