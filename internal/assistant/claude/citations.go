@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
-	"regexp"
-	"strconv"
+
+	"github.com/ebrahim5801/agent-brain-cli/internal/assistant"
 )
 
 type citationLine struct {
@@ -17,11 +17,6 @@ type citationLine struct {
 		} `json:"content"`
 	} `json:"message"`
 }
-
-var (
-	personalCitationRe = regexp.MustCompile(`(?:memory\s+#|\[#|#)(\d+)`)
-	teamCitationRe     = regexp.MustCompile(`team#([0-9a-f]{8,})`)
-)
 
 // ScanMemoryCitations scans a Claude Code session transcript for memory ids
 // the assistant restated in its replies. Only assistant text blocks are
@@ -41,8 +36,7 @@ func ScanMemoryCitations(path string) (personalIDs []int64, teamHandles []string
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 64<<10), maxLineBytes)
 
-	seenIDs := map[int64]bool{}
-	seenHandles := map[string]bool{}
+	var found assistant.CitationSet
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -57,25 +51,10 @@ func ScanMemoryCitations(path string) (personalIDs []int64, teamHandles []string
 			if block.Type != "text" {
 				continue
 			}
-			for _, m := range personalCitationRe.FindAllStringSubmatch(block.Text, -1) {
-				id, convErr := strconv.ParseInt(m[1], 10, 64)
-				if convErr != nil {
-					continue
-				}
-				if !seenIDs[id] {
-					seenIDs[id] = true
-					personalIDs = append(personalIDs, id)
-				}
-			}
-			for _, m := range teamCitationRe.FindAllStringSubmatch(block.Text, -1) {
-				handle := m[1]
-				if !seenHandles[handle] {
-					seenHandles[handle] = true
-					teamHandles = append(teamHandles, handle)
-				}
-			}
+			found.Scan(block.Text)
 		}
 	}
+	personalIDs, teamHandles = found.Result()
 	if scanErr := scanner.Err(); scanErr != nil {
 		return personalIDs, teamHandles, scanErr
 	}

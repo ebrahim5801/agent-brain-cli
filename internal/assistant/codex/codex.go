@@ -37,14 +37,19 @@ const mcpTableHeader = "mcp_servers." + MCPServerName
 // Interrupt. An adapter that cannot honestly produce an event installs no hook
 // for it rather than synthesizing one.
 var hookEvents = []struct {
-	Event  string // Codex CLI hook event name
-	Sub    string // agent-brain hook subcommand
-	Status string // Codex-specific, shown to the user while the hook runs
+	Event   string // Codex CLI hook event name
+	Sub     string // agent-brain hook subcommand
+	Status  string // Codex-specific, shown to the user while the hook runs
+	Timeout int    // seconds
 }{
-	{"SessionStart", "session-start", "agent-brain: loading project memory"},
-	{"UserPromptSubmit", "prompt", "agent-brain: refreshing project memory"},
-	{"PostToolUse", "tool-use", ""},
-	{"Stop", "stop", ""},
+	{"SessionStart", "session-start", "agent-brain: loading project memory", 10},
+	{"UserPromptSubmit", "prompt", "agent-brain: refreshing project memory", 10},
+	{"PostToolUse", "tool-use", "", 10},
+	{"Stop", "stop", "", 10},
+	// Codex clamps SessionEnd to 3 seconds whatever the file asks for, and warns
+	// on every session start when asked for more. Asking for 3 keeps the
+	// warning away and states the real budget the usage backfill has to fit in.
+	{"SessionEnd", "session-end", "", 3},
 }
 
 // configHome returns $CODEX_HOME if set, else ~/.codex. CODEX_HOME is Codex
@@ -155,13 +160,13 @@ func removeOurEntries(hooks map[string]any) bool {
 // hookEntry builds one event's matcher group. The matcher key is omitted
 // deliberately: an absent matcher matches every tool, which is what the
 // collector wants, and avoids guessing at each event's matcher vocabulary.
-func hookEntry(binPath, sub, status string) map[string]any {
+func hookEntry(binPath, sub, status string, timeout int) map[string]any {
 	// --assistant is mandatory. The hook subcommand's flag defaults to
 	// claude-code, so omitting it would file every Codex session under Claude.
 	h := map[string]any{
 		"type":    "command",
 		"command": binPath + " hook " + sub + " --assistant " + Assistant,
-		"timeout": 10,
+		"timeout": timeout,
 	}
 	if status != "" {
 		h["statusMessage"] = status
@@ -187,7 +192,7 @@ func Install(binPath string) (backups []string, err error) {
 		removeOurEntries(hooks)
 		for _, he := range hookEvents {
 			groups, _ := hooks[he.Event].([]any)
-			hooks[he.Event] = append(groups, hookEntry(binPath, he.Sub, he.Status))
+			hooks[he.Event] = append(groups, hookEntry(binPath, he.Sub, he.Status, he.Timeout))
 		}
 		return true, nil
 	})

@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
-	"sort"
 
+	"github.com/ebrahim5801/agent-brain-cli/internal/assistant"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
 )
 
@@ -80,42 +80,11 @@ func ParseTranscript(path string) (store.Usage, string, []store.ModelUsage, erro
 		m.CacheWrite += u.CacheCreationInputTokens
 		perModel[tl.Message.Model] = m
 	}
-	model, breakdown := modelBreakdown(perModel)
+	model, breakdown := assistant.ModelBreakdown(perModel)
 	if err := scanner.Err(); err != nil {
 		return usage, model, breakdown, err
 	}
 	return usage, model, breakdown, nil
-}
-
-// modelBreakdown turns a per-model usage map into a deterministic slice ordered
-// heaviest first (by total tokens, then model name) and picks the dominant
-// model — the one with the most input+output tokens, matching the historical
-// single-model selection. The empty model key (usage a transcript line omitted
-// a model for) is dropped from both.
-func modelBreakdown(perModel map[string]store.Usage) (string, []store.ModelUsage) {
-	rows := make([]store.ModelUsage, 0, len(perModel))
-	for m, u := range perModel {
-		if m == "" {
-			continue
-		}
-		rows = append(rows, store.ModelUsage{Model: m, Usage: u})
-	}
-	sort.Slice(rows, func(i, j int) bool {
-		ti := rows[i].Usage.Input + rows[i].Usage.Output + rows[i].Usage.CacheRead + rows[i].Usage.CacheWrite
-		tj := rows[j].Usage.Input + rows[j].Usage.Output + rows[j].Usage.CacheRead + rows[j].Usage.CacheWrite
-		if ti != tj {
-			return ti > tj
-		}
-		return rows[i].Model < rows[j].Model
-	})
-	var dominant string
-	var max int64 = -1
-	for _, r := range rows {
-		if n := r.Usage.Input + r.Usage.Output; n > max {
-			dominant, max = r.Model, n
-		}
-	}
-	return dominant, rows
 }
 
 // dominantModel picks the model with the most input+output tokens, ignoring the
