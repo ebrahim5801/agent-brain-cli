@@ -31,6 +31,7 @@ func sandbox(t *testing.T) string {
 	set("AGENT_BRAIN_CURSOR_HOME", filepath.Join(root, "cursor"))
 	set("AGENT_BRAIN_GEMINI_HOME", filepath.Join(root, "gemini"))
 	set("AGENT_BRAIN_OPENCODE_HOME", filepath.Join(root, "opencode"))
+	set("CODEX_HOME", filepath.Join(root, "codex"))
 	return root
 }
 
@@ -70,7 +71,7 @@ func settingsSnapshot(t *testing.T, root string) map[string][]byte {
 			return nil
 		}
 		// Only assistant config trees, not the data dir / config dir.
-		for _, sub := range []string{"claude", "copilot", "cursor", "gemini", "opencode"} {
+		for _, sub := range []string{"claude", "copilot", "cursor", "gemini", "opencode", "codex"} {
 			if bytes.Contains([]byte(path), []byte(string(os.PathSeparator)+sub+string(os.PathSeparator))) {
 				b, _ := os.ReadFile(path)
 				snap[path] = b
@@ -126,7 +127,7 @@ func TestUninstallIsolationLeavesOtherAssistantsIntact(t *testing.T) {
 	if st.Integrated() {
 		t.Errorf("cursor still integrated after uninstall: %+v", st)
 	}
-	for _, name := range []string{"claude-code", "copilot-cli", "gemini-cli", "opencode"} {
+	for _, name := range []string{"claude-code", "copilot-cli", "gemini-cli", "opencode", "codex"} {
 		a, _ := assistant.ByName(name)
 		st, _ := a.State()
 		if st.Tier != assistant.TierFull {

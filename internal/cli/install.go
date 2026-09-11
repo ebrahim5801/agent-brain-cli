@@ -73,6 +73,11 @@ func newInstallCmd() *cobra.Command {
 				for _, b := range backups {
 					fmt.Printf("  previous settings backed up to %s\n", b)
 				}
+				// Some hosts need a manual step before the hooks we just wrote
+				// actually run; those adapters say so here (assistant.PostInstallNotice).
+				if n, ok := a.(assistant.PostInstallNotice); ok {
+					fmt.Println(n.PostInstallNotice())
+				}
 			}
 
 			if anyFailed {

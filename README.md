@@ -3,9 +3,9 @@
 A local-first collector, memory store, and MCP server for AI coding assistants.
 
 agent-brain runs on your machine. It records how you actually use Claude Code,
-Cursor, GitHub Copilot CLI, Gemini CLI, and OpenCode — sessions, token usage,
-cost — and gives your assistants a persistent, project-scoped memory so they
-stop re-deriving what they already learned last week.
+Cursor, GitHub Copilot CLI, Gemini CLI, OpenCode, and Codex CLI — sessions,
+token usage, cost — and gives your assistants a persistent, project-scoped
+memory so they stop re-deriving what they already learned last week.
 
 Everything is stored in a local SQLite database you own. Nothing leaves your
 machine unless you explicitly link a project and grant consent.
@@ -61,6 +61,11 @@ To integrate specific assistants only:
 ```sh
 agent-brain install --assistant claude-code --assistant cursor
 ```
+
+Codex CLI needs one extra step: it will not run a hook until you approve it.
+After `agent-brain install`, open `codex`, run `/hooks`, and trust the
+agent-brain entries. Until you do, Codex records nothing and reports no error —
+`agent-brain status` carries the same reminder.
 
 ## Usage
 

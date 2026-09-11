@@ -7,6 +7,7 @@ package cli
 // elsewhere too; listing it here keeps the registered set in one place.
 import (
 	_ "github.com/ebrahim5801/agent-brain-cli/internal/assistant/claude"
+	_ "github.com/ebrahim5801/agent-brain-cli/internal/assistant/codex"
 	_ "github.com/ebrahim5801/agent-brain-cli/internal/assistant/copilot"
 	_ "github.com/ebrahim5801/agent-brain-cli/internal/assistant/cursor"
 	_ "github.com/ebrahim5801/agent-brain-cli/internal/assistant/gemini"

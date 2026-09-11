@@ -204,6 +204,15 @@ type ToolUseInjector interface {
 	ToolUseInjectionResponse(pack string) string
 }
 
+// PostInstallNotice is implemented by adapters whose host requires a manual
+// step before the installed hooks take effect (Codex CLI will not run a hook
+// until the user has approved its exact definition, and an unapproved hook is a
+// silent no-op). The install command prints the notice after a successful
+// install; adapters whose install is complete on its own don't implement it.
+type PostInstallNotice interface {
+	PostInstallNotice() string
+}
+
 // MidTurnResponder is implemented by adapters whose tool-use hook can push an
 // actionable prompt back to the model while the agent is still working — used to
 // trigger an interim memory checkpoint. The envelope matches the adapter's stop
@@ -227,6 +236,7 @@ const (
 	OrderCopilot  = 2
 	OrderGemini   = 3
 	OrderOpenCode = 4
+	OrderCodex    = 5
 )
 
 type registered struct {
@@ -244,7 +254,7 @@ func Register(order int, a Adapter) {
 }
 
 // Registry returns the adapters in canonical order
-// (claude-code, cursor, copilot-cli, gemini-cli, opencode).
+// (claude-code, cursor, copilot-cli, gemini-cli, opencode, codex).
 func Registry() []Adapter {
 	out := make([]Adapter, len(registry))
 	for i, r := range registry {
