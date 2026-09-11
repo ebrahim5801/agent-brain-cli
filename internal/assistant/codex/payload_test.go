@@ -207,10 +207,13 @@ func TestAdapterImplementsExpectedOptionalInterfaces(t *testing.T) {
 	if _, ok := a.(assistant.MidTurnResponder); ok {
 		t.Error("MidTurnResponder must stay unimplemented until PostToolUse block semantics are verified")
 	}
-	// Phase 2/3 surfaces, deliberately absent for now.
-	if _, ok := a.(assistant.UsageBackfiller); ok {
-		t.Error("UsageBackfiller belongs to Phase 2")
+	if _, ok := a.(assistant.UsageBackfiller); !ok {
+		t.Error("want UsageBackfiller: usage is backfilled from the rollout JSONL")
 	}
+	if _, ok := a.(assistant.CitationScanner); !ok {
+		t.Error("want CitationScanner: the rollout JSONL carries the assistant's replies")
+	}
+	// Phase 3, and only if a probe shows SubagentStop fires at all.
 	if _, ok := a.(assistant.SubagentScanner); ok {
 		t.Error("SubagentScanner belongs to Phase 3")
 	}

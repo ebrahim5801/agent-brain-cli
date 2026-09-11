@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/ebrahim5801/agent-brain-cli/internal/assistant"
+	"github.com/ebrahim5801/agent-brain-cli/internal/store"
 )
 
 const maxPayloadBytes = 10 << 20
@@ -91,6 +92,28 @@ func (Adapter) PostInstallNotice() string {
 	return "  One manual step left: Codex will not run a hook until you approve it.\n" +
 		"  Open codex, run /hooks, and trust the agent-brain entries.\n" +
 		"  Until then agent-brain records nothing from Codex sessions and reports no error."
+}
+
+// BackfillUsage recovers absolute token totals from the session's rollout JSONL
+// at session-end (assistant.UsageBackfiller). No Codex hook payload carries
+// token counts, so this is the only source; a missing path or a count-free file
+// yields ok=false and the session keeps its zero counters.
+func (Adapter) BackfillUsage(input assistant.HookInput) (store.Usage, string, []store.ModelUsage, bool) {
+	if input.TranscriptPath == "" {
+		return store.Usage{}, "", nil, false
+	}
+	return ParseRollout(input.TranscriptPath)
+}
+
+// ScanCitations recovers memory ids the assistant restated in its replies
+// during the session (assistant.CitationScanner). ok reports only whether the
+// scan ran; an empty result from a readable file is a legitimate "no
+// citations".
+func (Adapter) ScanCitations(input assistant.HookInput) ([]int64, []string, bool) {
+	if input.TranscriptPath == "" {
+		return nil, nil, false
+	}
+	return ScanMemoryCitations(input.TranscriptPath)
 }
 
 func (Adapter) ParseHook(event string, r io.Reader) (assistant.HookInput, error) {

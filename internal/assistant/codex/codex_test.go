@@ -120,8 +120,8 @@ func TestFreshInstallWritesBothFiles(t *testing.T) {
 		if e["type"] != "command" {
 			t.Errorf("hooks[%s].type = %v, want command", he.Event, e["type"])
 		}
-		if e["timeout"] != float64(10) {
-			t.Errorf("hooks[%s].timeout = %v, want 10", he.Event, e["timeout"])
+		if e["timeout"] != float64(he.Timeout) {
+			t.Errorf("hooks[%s].timeout = %v, want %d", he.Event, e["timeout"], he.Timeout)
 		}
 		if he.Status == "" {
 			if _, present := e["statusMessage"]; present {
