@@ -44,4 +44,10 @@ jobs:
           cache: true
       # Fails on ANY finding. govulncheck reports only vulnerabilities reachable
       # from the call graph, so every finding is actionable by construction.
-      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      #
+      # Pinned like golangci-lint above, and for a sharper reason: x/vuln v1.8.0
+      # raised its own go directive to 1.26.0, so @latest scans against a
+      # toolchain this workflow does not pin and the release does not ship.
+      # v1.7.0 is the last release that builds on Go 1.25. The advisory database
+      # is fetched at run time, so the pin delays no finding.
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
