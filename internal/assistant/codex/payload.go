@@ -3,10 +3,12 @@ package codex
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/ebrahim5801/agent-brain-cli/internal/assistant"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
+	"github.com/ebrahim5801/agent-brain-cli/wire"
 )
 
 const maxPayloadBytes = 10 << 20
@@ -17,12 +19,17 @@ const maxPayloadBytes = 10 << 20
 // `tool_input` and `tool_response` (PostToolUse — the full command and its full
 // output), and `last_assistant_message` (Stop) cannot reach storage even if a
 // later caller is careless.
+// On SubagentStop the same exclusion covers the child: `last_assistant_message`
+// carries the subagent's final answer and has no field here either.
 type payload struct {
-	SessionID      string `json:"session_id"`
-	Cwd            string `json:"cwd"`
-	TranscriptPath string `json:"transcript_path"`
-	ToolName       string `json:"tool_name"`
-	Model          string `json:"model"`
+	SessionID           string `json:"session_id"`
+	Cwd                 string `json:"cwd"`
+	TranscriptPath      string `json:"transcript_path"`
+	ToolName            string `json:"tool_name"`
+	Model               string `json:"model"`
+	AgentID             string `json:"agent_id"`
+	AgentType           string `json:"agent_type"`
+	AgentTranscriptPath string `json:"agent_transcript_path"`
 }
 
 func parsePayload(r io.Reader) (payload, error) {
@@ -59,11 +66,15 @@ func (Adapter) Uninstall() error {
 	return Uninstall()
 }
 
-// trustNote is carried on every integrated state. Codex will not run a hook
-// until the user approves it, and an unapproved hook is a silent no-op — so an
-// install that looks perfect on disk can be recording nothing. Status must say
-// so rather than let the tier imply otherwise.
-const trustNote = "hooks need one-time approval in Codex (/hooks); until approved they do not run"
+// Codex will not run a hook until the user approves it, and an unapproved hook
+// is a silent no-op — so an install that looks perfect on disk can be recording
+// nothing, and the tier alone would imply otherwise. These say which of the two
+// it is; a fully approved install says nothing, the way every other adapter's
+// healthy state does.
+const (
+	trustNoteNone = "hooks are installed but NOT approved in Codex — run /hooks there; until then nothing is recorded and no error is reported"
+	trustNoteSome = "only %d of %d hooks are approved in Codex — run /hooks there; the rest are not recorded and report no error"
+)
 
 func (Adapter) State() (assistant.State, error) {
 	s := assistant.State{Detected: Detected(), HookEventsWanted: ExpectedEventCount()}
@@ -79,7 +90,16 @@ func (Adapter) State() (assistant.State, error) {
 	s.MCPRegistered = registered
 	s.Tier = assistant.DeriveTier(s.HookEvents, s.HookEventsWanted, s.MCPRegistered)
 	if s.HookEvents > 0 {
-		s.Notes = append(s.Notes, trustNote)
+		trusted, err := TrustedEvents()
+		if err != nil {
+			return s, err
+		}
+		switch {
+		case len(trusted) == 0:
+			s.Notes = append(s.Notes, trustNoteNone)
+		case len(trusted) < s.HookEvents:
+			s.Notes = append(s.Notes, fmt.Sprintf(trustNoteSome, len(trusted), s.HookEvents))
+		}
 	}
 	return s, nil
 }
@@ -121,13 +141,61 @@ func (Adapter) ParseHook(event string, r io.Reader) (assistant.HookInput, error)
 	if err != nil {
 		return assistant.HookInput{}, err
 	}
-	return assistant.HookInput{
+	in := assistant.HookInput{
 		SessionKey:     p.SessionID,
 		Cwd:            p.Cwd,
 		TranscriptPath: p.TranscriptPath,
 		ToolName:       p.ToolName,
 		Model:          p.Model,
-	}, nil
+	}
+	// transcript_path names the parent's rollout on every event, including this
+	// one; the child's is a separate field, and without it there is nothing to
+	// attribute a subagent to — Codex writes child rollouts flat into the day's
+	// sessions directory alongside unrelated ones.
+	if p.AgentID != "" && p.AgentTranscriptPath != "" {
+		in.Subagent = &assistant.SubagentRef{
+			AgentID:        p.AgentID,
+			AgentType:      wire.SanitizeAgentType(p.AgentType),
+			TranscriptPath: p.AgentTranscriptPath,
+		}
+	}
+	return in, nil
+}
+
+// ScanSubagents reports the subagent run a SubagentStop payload names
+// (assistant.SubagentScanner), with its usage read from the child's own rollout
+// JSONL by the same parser the parent session uses. Unlike Claude Code's
+// directory scan this cannot re-derive the full set later, so it returns
+// nothing on the stop and session-end re-scans; the capture at subagent-stop is
+// the complete one and the upsert makes repeats harmless.
+//
+// The run is reported even when its rollout cannot be read: the payload is
+// proof the subagent ran, and a row with zero tokens is honest about that,
+// where dropping it would lose the run entirely.
+func (Adapter) ScanSubagents(input assistant.HookInput) []assistant.Subagent {
+	ref := input.Subagent
+	if ref == nil {
+		return nil
+	}
+	sa := assistant.Subagent{
+		AgentID:        ref.AgentID,
+		AgentType:      ref.AgentType,
+		TranscriptPath: ref.TranscriptPath,
+	}
+	// Summary and Prompt stay empty by design. Both are content, and Codex's
+	// spawn_agent encrypts the task text in the payload anyway, so there is
+	// nothing to read that would not mean opening this package's parser to
+	// message bodies it structurally excludes.
+	if s, ok := parseRollout(ref.TranscriptPath); ok {
+		sa.Model = s.Dominant
+		sa.Usage = s.Total
+		sa.StartedAt = s.StartedAt
+		sa.EndedAt = s.EndedAt
+	}
+	if sa.EndedAt == "" {
+		sa.EndedAt = store.Now()
+	}
+	return []assistant.Subagent{sa}
 }
 
 // InjectionResponse wraps the memory pack in Codex's SessionStart

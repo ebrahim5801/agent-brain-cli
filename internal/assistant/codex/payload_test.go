@@ -213,8 +213,10 @@ func TestAdapterImplementsExpectedOptionalInterfaces(t *testing.T) {
 	if _, ok := a.(assistant.CitationScanner); !ok {
 		t.Error("want CitationScanner: the rollout JSONL carries the assistant's replies")
 	}
-	// Phase 3, and only if a probe shows SubagentStop fires at all.
-	if _, ok := a.(assistant.SubagentScanner); ok {
-		t.Error("SubagentScanner belongs to Phase 3")
+	if _, ok := a.(assistant.SubagentScanner); !ok {
+		t.Error("want SubagentScanner: SubagentStop fires and names the child's rollout")
+	}
+	if _, ok := a.(assistant.PostInstallNotice); !ok {
+		t.Error("want PostInstallNotice: hooks do nothing until approved in Codex")
 	}
 }

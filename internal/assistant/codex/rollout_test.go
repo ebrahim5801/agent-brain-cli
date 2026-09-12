@@ -16,11 +16,13 @@ const fixture = "testdata/rollout.jsonl"
 
 // The fixture's two turns, as the parser should read them: turn-a ran on
 // gpt-6-astra across two records, turn-b on gpt-6-mini across two more, and
-// every usage object in the file is cumulative rather than incremental.
+// every usage object in the file is cumulative rather than incremental. Its
+// counts obey the invariants a real rollout does — total_tokens is input plus
+// output, and reasoning_output_tokens is inside output_tokens, never beside it.
 var (
 	wantAstra = store.Usage{Input: 300, Output: 30, CacheRead: 120, CacheWrite: 15}
-	wantMini  = store.Usage{Input: 200, Output: 27, CacheRead: 60, CacheWrite: 10}
-	wantTotal = store.Usage{Input: 500, Output: 57, CacheRead: 180, CacheWrite: 25}
+	wantMini  = store.Usage{Input: 200, Output: 20, CacheRead: 60, CacheWrite: 10}
+	wantTotal = store.Usage{Input: 500, Output: 50, CacheRead: 180, CacheWrite: 25}
 )
 
 func TestParseRolloutAbsoluteTotals(t *testing.T) {
@@ -79,10 +81,10 @@ func TestParseRolloutBreakdownReconcilesWithTotal(t *testing.T) {
 	}
 }
 
-// Codex reports reasoning tokens separately and store.Usage has no column for
-// them, so they are folded into Output. The fold is lossy; this pins it so it
-// changes deliberately. turn-b's last record is output 20 + reasoning 7.
-func TestParseRolloutFoldsReasoningIntoOutput(t *testing.T) {
+// reasoning_output_tokens is a subset of output_tokens, so adding the two
+// double-counts the reasoning. turn-b's last record is output 20 of which 7 are
+// reasoning; the answer is 20, and 27 is the regression this pins against.
+func TestParseRolloutExcludesReasoningFromOutput(t *testing.T) {
 	_, _, models, ok := ParseRollout(fixture)
 	if !ok {
 		t.Fatal("ParseRollout(fixture) not ok")
@@ -91,12 +93,66 @@ func TestParseRolloutFoldsReasoningIntoOutput(t *testing.T) {
 		if m.Model != "gpt-6-mini" {
 			continue
 		}
-		if m.Usage.Output != 27 {
-			t.Errorf("gpt-6-mini output = %d, want 27 (20 output + 7 reasoning)", m.Usage.Output)
+		if m.Usage.Output != 20 {
+			t.Errorf("gpt-6-mini output = %d, want 20 (output_tokens, which already contains the 7 reasoning tokens)", m.Usage.Output)
 		}
 		return
 	}
 	t.Fatal("gpt-6-mini missing from the breakdown")
+}
+
+// The fixture is only able to catch a reasoning double-count while its records
+// actually carry reasoning tokens, and it only models Codex honestly while
+// total_tokens equals input plus output. Both are easy to break by hand when
+// editing the fixture, so they are asserted rather than trusted.
+func TestFixtureMatchesCodexTokenInvariants(t *testing.T) {
+	data, err := os.ReadFile(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type counts struct {
+		Input     int64 `json:"input_tokens"`
+		Output    int64 `json:"output_tokens"`
+		Reasoning int64 `json:"reasoning_output_tokens"`
+		Total     int64 `json:"total_tokens"`
+	}
+	var line struct {
+		Type    string `json:"type"`
+		Payload struct {
+			Usage  *counts `json:"usage"`
+			Turn   *counts `json:"turn_token_usage"`
+			Thread *counts `json:"thread_token_usage"`
+		} `json:"payload"`
+	}
+	reasoning := int64(0)
+	records := 0
+	for i, raw := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		line.Payload.Usage, line.Payload.Turn, line.Payload.Thread = nil, nil, nil
+		if json.Unmarshal([]byte(raw), &line) != nil || line.Type != "token_usage_record" {
+			continue
+		}
+		for name, c := range map[string]*counts{
+			"usage": line.Payload.Usage, "turn_token_usage": line.Payload.Turn, "thread_token_usage": line.Payload.Thread,
+		} {
+			if c == nil {
+				continue
+			}
+			records++
+			reasoning += c.Reasoning
+			if c.Total != c.Input+c.Output {
+				t.Errorf("line %d %s: total_tokens %d != input %d + output %d", i+1, name, c.Total, c.Input, c.Output)
+			}
+			if c.Reasoning > c.Output {
+				t.Errorf("line %d %s: reasoning %d exceeds output %d, so it cannot be a subset of it", i+1, name, c.Reasoning, c.Output)
+			}
+		}
+	}
+	if records == 0 {
+		t.Fatal("fixture has no usage records")
+	}
+	if reasoning == 0 {
+		t.Error("no record carries reasoning tokens; the fixture cannot detect a reasoning double-count")
+	}
 }
 
 func TestParseRolloutToleratesMalformedLines(t *testing.T) {
@@ -228,24 +284,60 @@ func TestBackfillUsageAndScanCitationsNeedATranscriptPath(t *testing.T) {
 	}
 }
 
-// BenchmarkParseRollout is the SessionEnd budget gate. Codex clamps that hook
-// to 3 seconds, so a long session's rollout has to parse in well under it;
-// 50 MB across 200 turns is a deliberately pessimistic stand-in for one.
+// BenchmarkParseRollout is half of the SessionEnd budget gate. Codex clamps
+// that hook to 3 seconds, so a long session's rollout has to parse in well
+// under it; 50 MB across 200 turns is a deliberately pessimistic stand-in.
 func BenchmarkParseRollout(b *testing.B) {
+	path := writeBigRollout(b)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, _, _, ok := ParseRollout(path); !ok {
+			b.Fatal("ParseRollout failed")
+		}
+	}
+}
+
+// BenchmarkScanMemoryCitations is the other half. Session-end reads the same
+// rollout twice — once for usage, once for citations — and only the first read
+// was ever measured, so half the 3-second budget was being assumed rather than
+// checked. This scan is the more expensive of the two: its prefilter matches
+// assistant replies, which are most of a real rollout's bytes, where the usage
+// prefilter skips them.
+func BenchmarkScanMemoryCitations(b *testing.B) {
+	path := writeBigRollout(b)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, _, ok := ScanMemoryCitations(path); !ok {
+			b.Fatal("ScanMemoryCitations failed")
+		}
+	}
+}
+
+func writeBigRollout(b *testing.B) string {
+	b.Helper()
 	path := filepath.Join(b.TempDir(), "big.jsonl")
 	f, err := os.Create(path)
 	if err != nil {
 		b.Fatal(err)
 	}
-	// response_item lines dominate a real rollout's bytes, which is what the
-	// parser's prefix filter exists to skip.
-	noise := strings.Repeat("x", 4096)
+	// response_item lines dominate a real rollout's bytes, which is what both
+	// scans' prefilters exist to skip. The noise carries '#' in the shapes
+	// assistant prose actually uses — a heading, a shell comment — so the
+	// citation prefilter is measured rejecting them rather than handed a file
+	// with no '#' in it at all; every tenth message then carries a real
+	// citation, so the decode path is measured too.
+	noise := "## notes\n#!/bin/sh # nothing to cite here " + strings.Repeat("x", 4096)
+	cited := "per memory #12 and [#34], see team#abc12345 " + strings.Repeat("y", 4096)
 	const turns = 200
 	var written int64
 	for turn := 0; turn < turns; turn++ {
 		fmt.Fprintf(f, `{"type":"turn_context","payload":{"turn_id":"turn-%d","model":"gpt-6-astra"}}`+"\n", turn)
-		for written < int64(turn+1)*(50<<20)/turns {
-			n, err := fmt.Fprintf(f, `{"type":"response_item","payload":{"type":"message","id":"m","role":"assistant","content":[{"type":"output_text","text":%q}]}}`+"\n", noise)
+		for msg := 0; written < int64(turn+1)*(50<<20)/turns; msg++ {
+			text := noise
+			if msg%10 == 9 {
+				text = cited
+			}
+			n, err := fmt.Fprintf(f, `{"type":"response_item","payload":{"type":"message","id":"m","role":"assistant","content":[{"type":"output_text","text":%q}]}}`+"\n", text)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -260,11 +352,5 @@ func BenchmarkParseRollout(b *testing.B) {
 	if err := f.Close(); err != nil {
 		b.Fatal(err)
 	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, _, _, ok := ParseRollout(path); !ok {
-			b.Fatal("ParseRollout failed")
-		}
-	}
+	return path
 }

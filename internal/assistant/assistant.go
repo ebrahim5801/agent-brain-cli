@@ -37,6 +37,19 @@ type HookInput struct {
 	ToolName       string       // tool-use events only, name only
 	Model          string       // when the payload states it
 	Usage          *store.Usage // model-usage events only; nil elsewhere
+	Subagent       *SubagentRef // subagent-stop events only; nil elsewhere
+}
+
+// SubagentRef identifies the child run a subagent-stop payload names, for
+// assistants that report it on the hook rather than leaving it to be discovered
+// on disk (Codex CLI's agent_id / agent_transcript_path; Claude Code instead
+// writes agent transcripts into a directory beside the session's own). All
+// three members are identifiers and a path — no message text, no task text, and
+// no vocabulary another adapter has to agree on.
+type SubagentRef struct {
+	AgentID        string
+	AgentType      string
+	TranscriptPath string
 }
 
 // Tier is the plain-language integration level shown in status.

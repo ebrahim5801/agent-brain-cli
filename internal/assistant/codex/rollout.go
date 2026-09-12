@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"time"
 
 	"github.com/ebrahim5801/agent-brain-cli/internal/assistant"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
@@ -37,14 +38,16 @@ type tokenCounts struct {
 	ReasoningOutputTokens int64 `json:"reasoning_output_tokens"`
 }
 
-// usage folds reasoning tokens into Output. Codex bills and reports them
-// separately, and store.Usage has no column for them, so the split is lost
-// here — the same lossy fold opencode's parser makes, pinned by a test so it
-// changes deliberately rather than by accident.
+// usage maps Codex's counts onto store.Usage. reasoning_output_tokens is a
+// SUBSET of output_tokens, not a sibling of it, so it is deliberately not added:
+// Codex's own total_tokens is input_tokens + output_tokens on every record
+// including reasoning-bearing ones, and a probe session's printed `tokens used`
+// figure reconciled exactly against output_tokens alone. Adding it overstated
+// Output by 42% on that session.
 func (c tokenCounts) usage() store.Usage {
 	return store.Usage{
 		Input:      c.InputTokens,
-		Output:     c.OutputTokens + c.ReasoningOutputTokens,
+		Output:     c.OutputTokens,
 		CacheRead:  c.CachedInputTokens,
 		CacheWrite: c.CacheWriteInputTokens,
 	}
@@ -57,13 +60,25 @@ func (c tokenCounts) usage() store.Usage {
 // the workspace paths and permission profile. None of those fields exist on
 // this struct, so no caller can reach them.
 type rolloutLine struct {
-	Type    string `json:"type"`
-	Payload struct {
+	Type      string `json:"type"`
+	Timestamp string `json:"timestamp"`
+	Payload   struct {
 		TurnID           string       `json:"turn_id"`
 		Model            string       `json:"model"`
 		TurnTokenUsage   *tokenCounts `json:"turn_token_usage"`
 		ThreadTokenUsage *tokenCounts `json:"thread_token_usage"`
 	} `json:"payload"`
+}
+
+// rolloutSummary is everything one pass over a rollout yields. The timestamps
+// bound the run and are only read from the lines the parse already decodes, so
+// they cost no extra work inside the 3-second SessionEnd clamp.
+type rolloutSummary struct {
+	Total     store.Usage
+	Dominant  string
+	Breakdown []store.ModelUsage
+	StartedAt string
+	EndedAt   string
 }
 
 // ParseRollout recovers a Codex session's absolute token usage, dominant model,
@@ -85,16 +100,21 @@ type rolloutLine struct {
 // Measured against a real session: the per-turn last values summed to exactly
 // the final thread_token_usage, so the breakdown reconciles with the scalar.
 func ParseRollout(path string) (store.Usage, string, []store.ModelUsage, bool) {
+	s, ok := parseRollout(path)
+	return s.Total, s.Dominant, s.Breakdown, ok
+}
+
+func parseRollout(path string) (rolloutSummary, bool) {
 	f, err := os.Open(path)
 	if err != nil {
-		return store.Usage{}, "", nil, false
+		return rolloutSummary{}, false
 	}
 	defer f.Close()
 
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 64<<10), maxLineBytes)
 
-	var total store.Usage
+	var out rolloutSummary
 	haveTotal := false
 	modelOfTurn := map[string]string{} // turn_id -> model, from turn_context
 	usageOfTurn := map[string]store.Usage{}
@@ -110,6 +130,14 @@ func ParseRollout(path string) (store.Usage, string, []store.ModelUsage, bool) {
 		if err := json.Unmarshal(line, &rl); err != nil {
 			continue
 		}
+		if ts := normalizeTime(rl.Timestamp); ts != "" {
+			if out.StartedAt == "" || ts < out.StartedAt {
+				out.StartedAt = ts
+			}
+			if ts > out.EndedAt {
+				out.EndedAt = ts
+			}
+		}
 		switch rl.Type {
 		case "turn_context":
 			if rl.Payload.Model == "" {
@@ -121,7 +149,7 @@ func ParseRollout(path string) (store.Usage, string, []store.ModelUsage, bool) {
 			}
 		case "token_usage_record":
 			if rl.Payload.ThreadTokenUsage != nil {
-				total = rl.Payload.ThreadTokenUsage.usage()
+				out.Total = rl.Payload.ThreadTokenUsage.usage()
 				haveTotal = true
 			}
 			// A record with no turn_id cannot be attributed to a turn, so it
@@ -133,11 +161,16 @@ func ParseRollout(path string) (store.Usage, string, []store.ModelUsage, bool) {
 			}
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		return store.Usage{}, "", nil, false
+	// A scan error — in practice one response_item longer than maxLineBytes —
+	// stops the read early but does not invalidate what it already collected.
+	// thread_token_usage is cumulative, so the last one read is a real total as
+	// of that point: an undercount, not a fabrication, and strictly better than
+	// discarding it for zeros. reconcile re-reads the file later anyway.
+	if err := scanner.Err(); err != nil && !haveTotal {
+		return rolloutSummary{}, false
 	}
 	if !haveTotal {
-		return store.Usage{}, "", nil, false
+		return rolloutSummary{}, false
 	}
 
 	// turn_context is written before its turn's usage records, so the model in
@@ -156,8 +189,42 @@ func ParseRollout(path string) (store.Usage, string, []store.ModelUsage, bool) {
 		m.CacheWrite += u.CacheWrite
 		perModel[model] = m
 	}
-	dominant, breakdown := assistant.ModelBreakdown(perModel)
-	return total, dominant, breakdown, true
+	out.Dominant, out.Breakdown = assistant.ModelBreakdown(perModel)
+	return out, true
+}
+
+// normalizeTime reformats a rollout timestamp into store.TimeLayout;
+// unparsable values are dropped rather than stored in a foreign layout.
+func normalizeTime(s string) string {
+	if s == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return ""
+	}
+	return t.UTC().Format(store.TimeLayout)
+}
+
+// hasCitationShape reports whether a line could carry a memory citation at all.
+// Every form ends in '#' followed by a digit (a personal id, "#12" / "[#12]" /
+// "memory #12") or a hex character (a team handle, "team#abc12345"), so a line
+// without that shape cannot match and need not be decoded. It is the citation
+// scan's equivalent of the usage parse's line-type prefilter, and it matters as
+// much: assistant messages are most of a rollout's bytes, so the "output_text"
+// marker alone selects nearly every large line in the file. Assistant prose is
+// full of '#' that opens a comment or a markdown heading, and none of those
+// survive this check.
+func hasCitationShape(line []byte) bool {
+	for i := 0; i+1 < len(line); i++ {
+		if line[i] != '#' {
+			continue
+		}
+		if c := line[i+1]; c >= '0' && c <= '9' || c >= 'a' && c <= 'f' {
+			return true
+		}
+	}
+	return false
 }
 
 // citationLine is the whitelist for the assistant replies a citation scan
@@ -194,7 +261,7 @@ func ScanMemoryCitations(path string) ([]int64, []string, bool) {
 	var found assistant.CitationSet
 	for scanner.Scan() {
 		line := scanner.Bytes()
-		if !bytes.Contains(line, assistantMarker) {
+		if !bytes.Contains(line, assistantMarker) || !hasCitationShape(line) {
 			continue
 		}
 		var cl citationLine
@@ -211,9 +278,9 @@ func ScanMemoryCitations(path string) ([]int64, []string, bool) {
 			found.Scan(block.Text)
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		return nil, nil, false
-	}
+	// As in parseRollout, an oversized line truncates the read rather than
+	// invalidating it: the citations found before that point are real, and ok
+	// reports that a scan ran, not that it reached EOF.
 	personalIDs, teamHandles := found.Result()
 	return personalIDs, teamHandles, true
 }

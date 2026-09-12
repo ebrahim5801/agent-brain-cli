@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -288,6 +289,138 @@ func TestContains(t *testing.T) {
 	}
 }
 
+// TOML says [a.b], [ a . b ] and [a."b"] all name the same table, so a header
+// written any of those ways is ours. Missing one is the dangerous direction:
+// Contains would report the table absent, Upsert would append a second
+// definition of it, and a duplicated table makes the whole file invalid TOML —
+// so Codex would stop loading the user's config entirely, not just ignore us.
+func TestEquivalentHeaderSpellingsAreTheSameTable(t *testing.T) {
+	for _, spelling := range []string{
+		`[mcp_servers.agent-brain-memory]`,
+		`[ mcp_servers.agent-brain-memory ]`,
+		`[mcp_servers . agent-brain-memory]`,
+		`[mcp_servers."agent-brain-memory"]`,
+		`["mcp_servers"."agent-brain-memory"]`,
+		`[mcp_servers.'agent-brain-memory']`,
+		`[mcp_servers.agent-brain-memory]  # installed by agent-brain`,
+	} {
+		t.Run(spelling, func(t *testing.T) {
+			path := tmpFile(t)
+			write(t, path, spelling+"\ncommand = \"/old/agent-brain\"\nargs = [\"mcp\"]\n\n[tui]\ntheme = \"dark\"\n")
+
+			got, err := Contains(path, header)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !got {
+				t.Fatal("spelling not recognized as our table")
+			}
+			if _, err := Upsert(path, ourTable()); err != nil {
+				t.Fatal(err)
+			}
+			out := read(t, path)
+			if n := strings.Count(out, "agent-brain-memory"); n != 1 {
+				t.Errorf("table defined %d times after upsert, want 1:\n%s", n, out)
+			}
+			if strings.Contains(out, "/old/agent-brain") {
+				t.Errorf("stale command survived:\n%s", out)
+			}
+			if !strings.HasSuffix(out, "[tui]\ntheme = \"dark\"\n") {
+				t.Errorf("neighbour damaged:\n%s", out)
+			}
+		})
+	}
+}
+
+// A header we cannot parse that nonetheless names us is ambiguous. Treating it
+// as foreign would append a duplicate; treating it as ours would rewrite a line
+// we do not understand. Refusing is the only safe answer, and it must leave the
+// file alone.
+func TestUnparseableHeaderNamingUsIsRefused(t *testing.T) {
+	for _, line := range []string{
+		`[mcp_servers.agent-brain-memory`,
+		`[[mcp_servers.agent-brain-memory]]`,
+		`[mcp_servers."agent-brain-memory]`,
+	} {
+		t.Run(line, func(t *testing.T) {
+			path := tmpFile(t)
+			seed := line + "\ncommand = \"/x\"\n"
+			write(t, path, seed)
+
+			if _, err := Upsert(path, ourTable()); err == nil {
+				t.Error("expected a refusal")
+			}
+			if got := read(t, path); got != seed {
+				t.Errorf("file was modified despite the refusal:\n%q", got)
+			}
+			if _, err := Contains(path, header); err == nil {
+				t.Error("Contains reported an answer for an ambiguous header")
+			}
+		})
+	}
+}
+
+// A header we cannot parse that has nothing to do with us is not our business,
+// and must not block an install.
+func TestUnparseableForeignHeaderIsIgnored(t *testing.T) {
+	path := tmpFile(t)
+	write(t, path, "[[projects]]\nname = \"a\"\n[unclosed\n")
+	if _, err := Upsert(path, ourTable()); err != nil {
+		t.Fatalf("a foreign malformed header blocked the install: %v", err)
+	}
+	if !strings.Contains(read(t, path), "[mcp_servers.agent-brain-memory]") {
+		t.Error("table not written")
+	}
+}
+
+// A file that mixes line endings must keep each line's own ending. Normalizing
+// the document to one style would rewrite lines the user owns, which is exactly
+// what this package promises not to do.
+func TestMixedLineEndingsLeaveForeignLinesAlone(t *testing.T) {
+	path := tmpFile(t)
+	seed := "model = \"gpt-6\"\r\n\r\n[tui]\ntheme = \"dark\"\n"
+	write(t, path, seed)
+
+	if _, err := Upsert(path, ourTable()); err != nil {
+		t.Fatal(err)
+	}
+	got := read(t, path)
+	if !strings.HasPrefix(got, seed) {
+		t.Errorf("existing lines were re-terminated:\n%q\nwant prefix\n%q", got, seed)
+	}
+}
+
+// Two installs racing on one config must not share a temp file: a fixed name
+// lets each write into the other's, and a failed rename leaves it beside the
+// user's config forever.
+func TestConcurrentUpsertsDoNotCorruptOrLitter(t *testing.T) {
+	path := tmpFile(t)
+	write(t, path, "model = \"gpt-6\"\n")
+
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := Upsert(path, ourTable()); err != nil {
+				t.Errorf("concurrent upsert: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	got := read(t, path)
+	if n := strings.Count(got, "[mcp_servers.agent-brain-memory]"); n != 1 {
+		t.Errorf("table written %d times, want 1:\n%s", n, got)
+	}
+	if !strings.HasPrefix(got, "model = \"gpt-6\"\n") {
+		t.Errorf("existing content damaged:\n%s", got)
+	}
+	if leftovers := mustGlob(t, path+".agent-brain-tmp-*"); len(leftovers) != 0 {
+		t.Errorf("temp files left behind: %v", leftovers)
+	}
+}
+
 // A table name that is a prefix of ours must not be mistaken for it, and vice
 // versa — the match is on the whole header line, not a substring.
 func TestHeaderMatchIsExact(t *testing.T) {
@@ -319,5 +452,61 @@ func TestUpsertPreservesFilePermissions(t *testing.T) {
 	}
 	if fi.Mode().Perm() != 0o600 {
 		t.Errorf("permissions widened to %v", fi.Mode().Perm())
+	}
+}
+
+// Status asks one question per hook event against the same file. ContainsAll is
+// what keeps that a single read, and it has to agree with Contains exactly.
+func TestContainsAllAgreesWithContainsOverOneRead(t *testing.T) {
+	path := tmpFile(t)
+	write(t, path, "[a]\nx = 1\n\n[b.c]\ny = 2\n")
+	headers := []string{"a", "b.c", "missing", "b"}
+	found, err := ContainsAll(path, headers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range headers {
+		want, err := Contains(path, h)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if found[h] != want {
+			t.Errorf("ContainsAll[%q] = %v, Contains = %v", h, found[h], want)
+		}
+	}
+	if !found["a"] || !found["b.c"] || found["missing"] || found["b"] {
+		t.Errorf("found = %v", found)
+	}
+}
+
+func TestContainsAllOnAMissingFileFindsNothing(t *testing.T) {
+	found, err := ContainsAll(filepath.Join(t.TempDir(), "absent.toml"), []string{"a"})
+	if err != nil {
+		t.Fatalf("a missing file is absence, not an error: %v", err)
+	}
+	if found["a"] {
+		t.Error("found a table in a file that does not exist")
+	}
+}
+
+// Codex names a trusted hook with a table whose last segment is a filesystem
+// path carrying colons and dots. Quote plus the header parser have to survive a
+// round trip, or status reads every approval as missing.
+func TestQuotedPathSegmentRoundTrips(t *testing.T) {
+	for _, key := range []string{
+		"/home/dev/.codex/hooks.json:session_start:0:0",
+		`/home/dev/my "quoted" dir/hooks.json:stop:1:0`,
+		`/home/dev/back\slash/hooks.json:stop:0:0`,
+	} {
+		header := "hooks.state." + Quote(key)
+		path := tmpFile(t)
+		write(t, path, "[other]\nx = 1\n\n["+header+"]\ntrusted_hash = \"sha256:beef\"\n")
+		got, err := Contains(path, header)
+		if err != nil {
+			t.Fatalf("%s: %v", key, err)
+		}
+		if !got {
+			t.Errorf("did not find [%s]", header)
+		}
 	}
 }

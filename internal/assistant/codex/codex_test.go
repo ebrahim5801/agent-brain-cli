@@ -243,6 +243,71 @@ func TestReinstallIsIdempotent(t *testing.T) {
 	}
 }
 
+// Idempotence has to survive a user adding their own hook to an event we also
+// use. Removing our entry and appending a fresh one turns [ours, theirs] into
+// [theirs, ours] — same meaning, different bytes, so every reinstall would
+// rewrite the file and take another backup of it.
+func TestReinstallIsIdempotentAlongsideAForeignHookOnOurEvent(t *testing.T) {
+	dir := setupHome(t)
+	hooksPath := filepath.Join(dir, "hooks.json")
+	if _, err := Install(binPath); err != nil {
+		t.Fatal(err)
+	}
+
+	root := readJSON(t, hooksPath)
+	hooks := root["hooks"].(map[string]any)
+	hooks["PostToolUse"] = append(hooks["PostToolUse"].([]any),
+		map[string]any{"hooks": []any{map[string]any{"type": "command", "command": "echo user-tool-use"}}})
+	data, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hooksPath, append(data, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before := readFile(t, hooksPath)
+
+	backups, err := Install(binPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(backups) != 0 {
+		t.Errorf("reinstall returned backups: %v", backups)
+	}
+	if got := readFile(t, hooksPath); got != before {
+		t.Errorf("reinstall rewrote hooks.json:\n%s\nwant\n%s", got, before)
+	}
+	if !strings.Contains(before, "echo user-tool-use") {
+		t.Fatal("the foreign hook this test is about was not seeded")
+	}
+}
+
+// An event dropped from the table must still be cleaned up on the next install,
+// or a hook we no longer support keeps firing forever.
+func TestInstallRemovesOurEntriesFromEventsWeNoLongerUse(t *testing.T) {
+	dir := setupHome(t)
+	hooksPath := filepath.Join(dir, "hooks.json")
+	seed := map[string]any{"hooks": map[string]any{
+		"PermissionRequest": []any{map[string]any{"hooks": []any{
+			map[string]any{"type": "command", "command": binPath + " hook permission --assistant codex"},
+		}}},
+	}}
+	data, err := json.Marshal(seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hooksPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Install(binPath); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, hooksPath); strings.Contains(got, "PermissionRequest") {
+		t.Errorf("a hook for an event we no longer install survived:\n%s", got)
+	}
+}
+
 func TestUninstallRemovesOnlyOurEntries(t *testing.T) {
 	dir := setupHome(t)
 	hooksPath := filepath.Join(dir, "hooks.json")
@@ -423,28 +488,6 @@ func TestStateMatrix(t *testing.T) {
 			t.Errorf("tier = %v, want partial", s.Tier)
 		}
 	})
-}
-
-// Codex silently ignores hooks the user has not approved, so an install that
-// looks perfect on disk may be recording nothing. Status has to say so.
-func TestStateNoteMentionsTrustWheneverHooksAreInstalled(t *testing.T) {
-	setupHome(t)
-	if _, err := Install(binPath); err != nil {
-		t.Fatal(err)
-	}
-	s, err := Adapter{}.State()
-	if err != nil {
-		t.Fatal(err)
-	}
-	found := false
-	for _, n := range s.Notes {
-		if strings.Contains(n, "approval") {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("notes = %v, want a trust-approval caveat", s.Notes)
-	}
 }
 
 func TestPostInstallNoticeNamesTheSilentFailure(t *testing.T) {
