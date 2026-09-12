@@ -12,8 +12,13 @@ import (
 // because it tracks the pack format, which is agent-brain's, not any single
 // assistant's: two adapters scanning the same format with drifting regexes
 // would report different citations for identical replies.
+// The leading (?:^|[^\w#]) is what keeps a personal id out of a team handle: an
+// all-digit handle like team#12345678 otherwise matches the bare "#" form and
+// is reported as personal entry 12345678 as well. Requiring the '#' to open a
+// word rejects it, since 'm' precedes the '#' there, while every real personal
+// form — "#12", "[#12]", "memory #12", "memory#12" — still matches.
 var (
-	personalCitationRe = regexp.MustCompile(`(?:memory\s+#|\[#|#)(\d+)`)
+	personalCitationRe = regexp.MustCompile(`(?:^|[^\w#])(?:memory\s*#|\[#|#)(\d+)`)
 	teamCitationRe     = regexp.MustCompile(`team#([0-9a-f]{8,})`)
 )
 

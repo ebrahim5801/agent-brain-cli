@@ -11,6 +11,7 @@
 package codex
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,17 +40,22 @@ const mcpTableHeader = "mcp_servers." + MCPServerName
 var hookEvents = []struct {
 	Event   string // Codex CLI hook event name
 	Sub     string // agent-brain hook subcommand
+	Trust   string // how Codex spells the event inside a [hooks.state] key
 	Status  string // Codex-specific, shown to the user while the hook runs
 	Timeout int    // seconds
 }{
-	{"SessionStart", "session-start", "agent-brain: loading project memory", 10},
-	{"UserPromptSubmit", "prompt", "agent-brain: refreshing project memory", 10},
-	{"PostToolUse", "tool-use", "", 10},
-	{"Stop", "stop", "", 10},
+	{"SessionStart", "session-start", "session_start", "agent-brain: loading project memory", 10},
+	{"UserPromptSubmit", "prompt", "user_prompt_submit", "agent-brain: refreshing project memory", 10},
+	{"PostToolUse", "tool-use", "post_tool_use", "", 10},
+	// SubagentStop fires silently — unlike every other event, Codex prints no
+	// "hook: SubagentStop" line in the transcript — so its only observable
+	// effect is the sub-session row it produces.
+	{"SubagentStop", "subagent-stop", "subagent_stop", "", 10},
+	{"Stop", "stop", "stop", "", 10},
 	// Codex clamps SessionEnd to 3 seconds whatever the file asks for, and warns
 	// on every session start when asked for more. Asking for 3 keeps the
 	// warning away and states the real budget the usage backfill has to fit in.
-	{"SessionEnd", "session-end", "", 3},
+	{"SessionEnd", "session-end", "session_end", "", 3},
 }
 
 // configHome returns $CODEX_HOME if set, else ~/.codex. CODEX_HOME is Codex
@@ -112,12 +118,17 @@ func isOursHook(hook map[string]any) bool {
 	return isOursCommand(cmd)
 }
 
-// removeOurEntries strips agent-brain hook entries from every event's groups,
-// dropping groups left with no hooks and events left with no groups. Foreign
-// events, foreign groups, and foreign hooks inside our own groups are untouched.
-func removeOurEntries(hooks map[string]any) bool {
+// removeOurEntries strips agent-brain hook entries from every event the
+// selector picks, dropping groups left with no hooks and events left with no
+// groups. Foreign events, foreign groups, and foreign hooks inside our own
+// groups are untouched. Install selects only the events it no longer installs;
+// Uninstall selects them all.
+func removeOurEntries(hooks map[string]any, selected func(event string) bool) bool {
 	changed := false
 	for event, v := range hooks {
+		if !selected(event) {
+			continue
+		}
 		groups, ok := v.([]any)
 		if !ok {
 			continue
@@ -157,10 +168,8 @@ func removeOurEntries(hooks map[string]any) bool {
 	return changed
 }
 
-// hookEntry builds one event's matcher group. The matcher key is omitted
-// deliberately: an absent matcher matches every tool, which is what the
-// collector wants, and avoids guessing at each event's matcher vocabulary.
-func hookEntry(binPath, sub, status string, timeout int) map[string]any {
+// hookCommand builds one event's hook entry.
+func hookCommand(binPath, sub, status string, timeout int) map[string]any {
 	// --assistant is mandatory. The hook subcommand's flag defaults to
 	// claude-code, so omitting it would file every Codex session under Claude.
 	h := map[string]any{
@@ -171,7 +180,56 @@ func hookEntry(binPath, sub, status string, timeout int) map[string]any {
 	if status != "" {
 		h["statusMessage"] = status
 	}
+	return h
+}
+
+// hookEntry wraps a hook in its matcher group. The matcher key is omitted
+// deliberately: an absent matcher matches every tool, which is what the
+// collector wants, and avoids guessing at each event's matcher vocabulary.
+func hookEntry(h map[string]any) map[string]any {
 	return map[string]any{"hooks": []any{h}}
+}
+
+// upsertOurHook replaces our hook entry for one event where it already sits,
+// rather than removing it and appending a fresh one at the end. Position
+// matters for idempotence: a user who adds their own hook to an event we also
+// use leaves the array as [ours, theirs], and remove-then-append would return
+// [theirs, ours] — different bytes, so every reinstall would rewrite the file
+// and take another backup. Returns the event's groups and whether ours was
+// found; duplicates of ours are dropped so the entry stays unique.
+func upsertOurHook(groups []any, h map[string]any) ([]any, bool) {
+	replaced := false
+	var kept []any
+	for _, g := range groups {
+		group, ok := g.(map[string]any)
+		if !ok {
+			kept = append(kept, g)
+			continue
+		}
+		inner, ok := group["hooks"].([]any)
+		if !ok {
+			kept = append(kept, g)
+			continue
+		}
+		var keptHooks []any
+		for _, x := range inner {
+			if hook, ok := x.(map[string]any); ok && isOursHook(hook) {
+				if replaced {
+					continue
+				}
+				keptHooks = append(keptHooks, h)
+				replaced = true
+				continue
+			}
+			keptHooks = append(keptHooks, x)
+		}
+		if len(keptHooks) == 0 {
+			continue
+		}
+		group["hooks"] = keptHooks
+		kept = append(kept, group)
+	}
+	return kept, replaced
 }
 
 // Install merges agent-brain's hook entries into hooks.json and its MCP server
@@ -189,10 +247,20 @@ func Install(binPath string) (backups []string, err error) {
 			hooks = map[string]any{}
 			root["hooks"] = hooks
 		}
-		removeOurEntries(hooks)
+		wanted := map[string]bool{}
+		for _, he := range hookEvents {
+			wanted[he.Event] = true
+		}
+		// Events we used to install but no longer do still have to be cleaned.
+		removeOurEntries(hooks, func(event string) bool { return !wanted[event] })
 		for _, he := range hookEvents {
 			groups, _ := hooks[he.Event].([]any)
-			hooks[he.Event] = append(groups, hookEntry(binPath, he.Sub, he.Status, he.Timeout))
+			h := hookCommand(binPath, he.Sub, he.Status, he.Timeout)
+			groups, replaced := upsertOurHook(groups, h)
+			if !replaced {
+				groups = append(groups, hookEntry(h))
+			}
+			hooks[he.Event] = groups
 		}
 		return true, nil
 	})
@@ -233,10 +301,7 @@ func mcpTable(binPath string) tomlfile.Table {
 // tomlString quotes a value as a TOML basic string. Only the escapes reachable
 // from a filesystem path are handled; a path containing a control character is
 // not something we can round-trip honestly.
-func tomlString(s string) string {
-	r := strings.NewReplacer(`\`, `\\`, `"`, `\"`)
-	return `"` + r.Replace(s) + `"`
-}
+func tomlString(s string) string { return tomlfile.Quote(s) }
 
 // Uninstall removes exactly the entries Install added, leaving every foreign
 // hook event, matcher group, hook, and MCP server untouched. A never-integrated
@@ -252,7 +317,7 @@ func Uninstall() error {
 		if !ok {
 			return false, nil
 		}
-		changed := removeOurEntries(hooks)
+		changed := removeOurEntries(hooks, func(string) bool { return true })
 		if len(hooks) == 0 {
 			delete(root, "hooks")
 		}
@@ -298,19 +363,93 @@ func InstalledEvents() ([]string, error) {
 }
 
 func anyOurs(groups []any) bool {
-	for _, g := range groups {
-		group, ok := g.(map[string]any)
-		if !ok {
+	_, _, ok := ourPosition(groups)
+	return ok
+}
+
+// ourPosition locates our hook within one event's matcher groups, as the pair
+// of indices Codex uses to name it in a trust key.
+func ourPosition(groups []any) (group, hook int, ok bool) {
+	for gi, g := range groups {
+		m, isMap := g.(map[string]any)
+		if !isMap {
 			continue
 		}
-		inner, _ := group["hooks"].([]any)
-		for _, h := range inner {
-			if hook, ok := h.(map[string]any); ok && isOursHook(hook) {
-				return true
+		inner, _ := m["hooks"].([]any)
+		for hi, h := range inner {
+			if entry, isMap := h.(map[string]any); isMap && isOursHook(entry) {
+				return gi, hi, true
 			}
 		}
 	}
-	return false
+	return 0, 0, false
+}
+
+// trustHeader is the config.toml table Codex writes when a user approves one
+// hook: [hooks.state."<hooks.json path>:<event>:<group>:<hook>"], holding a
+// trusted_hash of the approved definition.
+func trustHeader(hooksPath, event string, group, hook int) string {
+	key := fmt.Sprintf("%s:%s:%d:%d", hooksPath, event, group, hook)
+	return "hooks.state." + tomlfile.Quote(key)
+}
+
+// TrustedEvents returns the events whose agent-brain hook the user has approved
+// in Codex. Approval is what makes an installed hook actually run (§6), and
+// Codex reports an unapproved one nowhere, so status reads the state directly.
+//
+// Presence of the table is the whole test; the hash it carries is not verified.
+// Nothing in the file says how that digest is computed and it did not fall out
+// of an exhaustive guess, so a stale entry — one approved before we rewrote the
+// hook — still reads as approved. Both directions of the remaining error are
+// survivable and the important one is exact: a hook that was never approved has
+// no entry at all, which is the case that silently records nothing. And if our
+// reading of the index pair is ever wrong, the lookup misses and status nags
+// about approval that is already granted, rather than promising capture that
+// is not happening.
+func TrustedEvents() ([]string, error) {
+	hPath, err := HooksPath()
+	if err != nil {
+		return nil, err
+	}
+	root, existed, err := settingsfile.Load(hPath)
+	if err != nil || !existed {
+		return nil, err
+	}
+	hooks, ok := root["hooks"].(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+	cPath, err := ConfigPath()
+	if err != nil {
+		return nil, err
+	}
+
+	headers := map[string]string{}
+	var want []string
+	for _, he := range hookEvents {
+		groups, ok := hooks[he.Event].([]any)
+		if !ok {
+			continue
+		}
+		group, hook, ok := ourPosition(groups)
+		if !ok {
+			continue
+		}
+		h := trustHeader(hPath, he.Trust, group, hook)
+		headers[he.Event] = h
+		want = append(want, h)
+	}
+	found, err := tomlfile.ContainsAll(cPath, want)
+	if err != nil {
+		return nil, err
+	}
+	var trusted []string
+	for _, he := range hookEvents {
+		if h, ok := headers[he.Event]; ok && found[h] {
+			trusted = append(trusted, he.Event)
+		}
+	}
+	return trusted, nil
 }
 
 // ExpectedEventCount is how many hook events a healthy install registers. It is
