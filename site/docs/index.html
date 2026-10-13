@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docs — agent-brain</title>
+<meta name="description" content="Install, verify, stats, memory, cloud dashboard, storage, updating, uninstall, privacy and troubleshooting for agent-brain.">
+<meta property="og:title" content="agent-brain docs">
+<meta property="og:type" content="website">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<script src="/assets/theme.js"></script>
+<script src="/assets/site.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="#0d9488"/><g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"><path d="M10 10 L16 16 L22 10"/><path d="M16 16 L16 23"/></g><g fill="#ffffff"><circle cx="10" cy="10" r="2.6"/><circle cx="22" cy="10" r="2.6"/><circle cx="16" cy="16" r="3"/><circle cx="16" cy="23" r="2.6"/></g></svg>
+      agent-brain
+    </a>
+    <nav class="main-nav" id="primary-nav" data-main-nav aria-label="Primary">
+      <a href="/#features">Features</a>
+      <a href="/#quick-start">Quick start</a>
+      <a href="/#plans">Free vs Pro</a>
+      <a href="/#faq">FAQ</a>
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="https://github.com/ebrahim5801/agent-brain-cli">GitHub</a>
+    </nav>
+    <div class="header-actions">
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle dark mode">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v3M12 18.5v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+      </button>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="primary-nav" aria-label="Toggle navigation menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<div class="container">
+<div class="docs-shell">
+
+  <button class="docs-toc-toggle" type="button" data-docs-toc-toggle aria-expanded="false" aria-controls="docs-sidebar">Contents</button>
+
+  <aside class="docs-sidebar" id="docs-sidebar" data-docs-sidebar aria-label="Docs sections">
+    <ul class="docs-nav">
+      <li><a href="#install">Install</a></li>
+      <li><a href="#verify">Verify</a></li>
+      <li><a href="#stats">Stats</a></li>
+      <li><a href="#memory">Memory (Pro)</a></li>
+      <li><a href="#cloud">Cloud dashboard and team memory</a></li>
+      <li><a href="#storage">Storage backends</a></li>
+      <li><a href="#updating">Updating</a></li>
+      <li><a href="#uninstall">Uninstall</a></li>
+      <li><a href="#privacy">Privacy and data retention</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+      <li><a href="#faq">FAQ</a></li>
+    </ul>
+  </aside>
+
+  <div class="docs-main">
+
+<!-- ============================== INSTALL ============================== -->
+<section id="install" aria-labelledby="install-title">
+  <p class="eyebrow docs-eyebrow">Getting started</p>
+  <h2 id="install-title">Install</h2>
+  <p class="lede">agent-brain ships as a prebuilt binary. You do not need Go. It runs on Linux, macOS and Windows, on amd64 or arm64.</p>
+
+  <h3>macOS and Linux</h3>
+  <div class="code-wrap">
+    <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy macOS and Linux install command">Copy</button></div>
+    <pre><code>curl -fsSL https://agentbrain.wecansync.com/install.sh | sh</code></pre>
+  </div>
+
+  <h3>Windows PowerShell</h3>
+  <div class="code-wrap">
+    <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy Windows install command">Copy</button></div>
+    <pre><code>irm https://agentbrain.wecansync.com/install.ps1 | iex</code></pre>
+  </div>
+
+  <h3>What the installer does</h3>
+  <ol>
+    <li>Downloads the prebuilt binary for your OS and CPU from <code class="il">https://agentbrain.wecansync.com/releases/</code>.</li>
+    <li>Checks its SHA-256 against the release's <code class="il">checksums.txt</code>.</li>
+    <li>Installs it to <code class="il">~/.local/bin</code> (Windows: <code class="il">%LOCALAPPDATA%\Programs\agent-brain</code>).</li>
+    <li>Runs <code class="il">agent-brain install</code> to integrate the assistants it finds. This step asks before changing anything unless <code class="il">AGENT_BRAIN_YES=1</code> is set.</li>
+  </ol>
+
+  <h3>Installer options</h3>
+  <p>The installer reads environment variables. On Windows, set them with <code class="il">$env:NAME="value"</code> before running <code class="il">irm</code>.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col">Variable</th><th scope="col">Effect</th></tr></thead>
+      <tbody>
+        <tr><td><code class="il">AGENT_BRAIN_VERSION=0.1.0</code></td><td>Pins a version instead of the latest.</td></tr>
+        <tr><td><code class="il">AGENT_BRAIN_BIN_DIR=DIR</code></td><td>Picks the install folder.</td></tr>
+        <tr><td><code class="il">AGENT_BRAIN_NO_INTEGRATE=1</code></td><td>Installs the binary only. Skips <code class="il">agent-brain install</code>.</td></tr>
+        <tr><td><code class="il">AGENT_BRAIN_YES=1</code></td><td>Answers yes to prompts.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="manual-download">Manual download</h3>
+  <p><code class="il">https://agentbrain.wecansync.com/releases/latest.json</code> names the current version and its files. Archives live at <code class="il">/releases/&lt;version&gt;/agent-brain_&lt;os&gt;_&lt;arch&gt;.tar.gz</code> (<code class="il">.zip</code> on Windows), with <code class="il">checksums.txt</code> alongside. <code>os</code> is <code class="il">linux</code>, <code class="il">darwin</code> or <code class="il">windows</code>. <code>arch</code> is <code class="il">amd64</code> or <code class="il">arm64</code>.</p>
+  <div class="table-wrap" data-latest-table>
+    <table>
+      <thead><tr><th scope="col">OS</th><th scope="col">CPU</th><th scope="col">File</th><th scope="col">SHA-256</th></tr></thead>
+      <tbody data-latest-assets>
+        <tr><td colspan="4">Loading the file list from latest.json. Without JavaScript, use the pattern above: <code class="il">/releases/&lt;version&gt;/agent-brain_&lt;os&gt;_&lt;arch&gt;.tar.gz</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>From source</h3>
+  <p>Building from source needs Go 1.25 or newer.</p>
+  <div class="code-wrap">
+    <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy from-source install commands">Copy</button></div>
+    <pre><code>git clone https://github.com/ebrahim5801/agent-brain-cli.git &amp;&amp; cd agent-brain-cli &amp;&amp; ./install.sh</code></pre>
+  </div>
+  <p>Or, with Go installed:</p>
+  <div class="code-wrap">
+    <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy go install commands">Copy</button></div>
+    <pre><code>go install github.com/ebrahim5801/agent-brain-cli/cmd/agent-brain@latest
+agent-brain install</code></pre>
+  </div>
+</section>
+
+<!-- ============================== VERIFY ============================== -->
+<section id="verify" aria-labelledby="verify-title">
+  <p class="eyebrow docs-eyebrow">Getting started</p>
+  <h2 id="verify-title">Verify</h2>
+  <p>Check the integration and collection state:</p>
+  <div class="code-wrap">
+    <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy verify command">Copy</button></div>
+    <pre><code>agent-brain status</code></pre>
+  </div>
+  <p>You get one line per assistant showing whether it is detected and integrated. The output also shows the database location and the last captured event. Run an assistant session, check again, and the last-event time should move.</p>
+  <p><code class="il">agent-brain install</code> detects every supported assistant and integrates each one. To limit it to some assistants, pass <code class="il">--assistant</code> once for each one:</p>
+  <div class="code-wrap">
+    <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy install with assistant filter command">Copy</button></div>
+    <pre><code>agent-brain install --assistant claude-code --assistant cursor</code></pre>
+  </div>
+  <p>The names are <code class="il">claude-code</code> (Claude Code), <code class="il">cursor</code> (Cursor), <code class="il">copilot-cli</code> (GitHub Copilot CLI), <code class="il">gemini-cli</code> (Gemini CLI), <code class="il">opencode</code> (OpenCode) and <code class="il">codex</code> (Codex CLI). <code class="il">agent-brain uninstall</code> takes the same <code class="il">--assistant</code> option. Existing settings are kept, a timestamped backup is written first, no file inside a repository is touched, and running the command again is safe.</p>
+  <div class="callout note">
+    <span class="callout-label">Codex CLI</span>
+    <p>Codex needs its hooks trusted once. See <a href="#troubleshooting">Troubleshooting</a>.</p>
+  </div>
+</section>
+
+<!-- ============================== STATS ============================== -->
+<section id="stats" aria-labelledby="stats-title">
+  <p class="eyebrow docs-eyebrow">Usage</p>
+  <h2 id="stats-title">Stats</h2>
+  <p>Collection and <code class="il">agent-brain stats</code> are free, local and offline, and need no account. Every session is captured automatically and attributed to its project, with no configuration.</p>
+  <div class="cmd-ref">
+    <div class="cmd-ref-item"><code class="il">agent-brain stats</code><p>Token usage and cost for the current week, grouped by project. Add flags to change the view.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain stats --daily</code><p>Groups by day.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain stats --weekly</code><p>Groups by week.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain stats --sessions</code><p>Lists individual sessions with their summaries.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain stats --session ID</code><p>Lists only the session with this id. The short id prefix works.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain stats --project NAME</code><p>Filters to one project by name.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain stats --since YYYY-MM-DD</code><p>Starts from this date. The default is the start of the current week.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain stats --json</code><p>Machine-readable output.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain stats --prompts</code><p>Also prints each sub-session's full spawn prompt. These are stored locally and never synced.</p></div>
+  </div>
+  <p>Where an assistant reports token counts, agent-brain records them. Where it does not, the count is recorded as absent rather than estimated.</p>
+</section>
+
+<!-- ============================== MEMORY ============================== -->
+<section id="memory" aria-labelledby="memory-title">
+  <p class="eyebrow docs-eyebrow">Pro</p>
+  <h2 id="memory-title">Memory (Pro)</h2>
+  <p>Assistants forget everything between sessions. agent-brain gives them an MCP server with two tools, <code class="il">memory_search</code> and <code class="il">memory_save</code>, plus a session-start hook that injects the most relevant entries. Memory needs a Pro account (<code class="il">agent-brain login</code>) or membership in a paying team's project.</p>
+  <p>Entries are typed as <code class="il">decision</code>, <code class="il">convention</code>, <code class="il">task_state</code> or <code class="il">fact</code>. Each one records the git state it was captured at. Ranking flags stale entries rather than trusting them silently.</p>
+
+  <h3>Turn memory on or off</h3>
+  <div class="cmd-ref">
+    <div class="cmd-ref-item"><code class="il">agent-brain memory enable</code><p>Turns on personal memory, or re-enables it for this project.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory disable</code><p>Turns memory off for this project. Add <code class="il">--all</code> to turn it off everywhere.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory pause</code><p>Stops contributing this project's memory. Serving continues.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory resume</code><p>Resumes contributing this project's memory.</p></div>
+  </div>
+
+  <h3>Inspect and edit entries</h3>
+  <div class="cmd-ref">
+    <div class="cmd-ref-item"><code class="il">agent-brain memory list</code><p>Lists this project's memory entries.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory show ID</code><p>Shows one entry in full.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory edit ID</code><p>Edits an entry's content in <code class="il">$EDITOR</code>, or pass <code class="il">--content</code>.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory priority ID critical|normal|background</code><p>Reclassifies how hard an entry competes for the session-start memory budget.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory delete ID</code><p>Permanently deletes an entry.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory restore ID</code><p>Re-activates a superseded or deleted entry.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory wipe</code><p>Deletes all memory for this project. Each entry can still be restored.</p></div>
+  </div>
+
+  <h3 id="capture">Capture settings</h3>
+  <p>agent-brain asks the assistant to save memory at three points:</p>
+  <ul>
+    <li>after 10 tool calls of work since the last save, not after every reply;</li>
+    <li>with a mid-task checkpoint every 25 tool calls;</li>
+    <li>before the context is compacted.</li>
+  </ul>
+  <div class="cmd-ref">
+    <div class="cmd-ref-item"><code class="il">agent-brain memory capture</code><p>Shows the current settings.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory capture --every N</code><p>Changes the first trigger. <code class="il">0</code> turns end-of-reply saves off. <code class="il">1</code> means every reply that used a tool.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory capture --checkpoint N</code><p>Changes the mid-task checkpoint. <code class="il">0</code> turns it off.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory capture --reset</code><p>Restores the defaults.</p></div>
+  </div>
+</section>
+
+<!-- ============================== CLOUD ============================== -->
+<section id="cloud" aria-labelledby="cloud-title">
+  <p class="eyebrow docs-eyebrow">Optional</p>
+  <h2 id="cloud-title">Cloud dashboard and team memory</h2>
+  <p>The CLI works fully offline. The cloud dashboard is optional. Nothing is sent until you complete all three steps:</p>
+  <div class="code-wrap">
+    <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy login and link commands">Copy</button></div>
+    <pre><code>agent-brain login                  # once per machine; approve in the browser
+agent-brain link &lt;project-key&gt;     # once per project, inside its directory
+# the first link asks for consent to send usage numbers</code></pre>
+  </div>
+  <p>Create the project on the web dashboard first to get its key. After linking, a background service syncs usage numbers. Only numbers are sent: timestamps, durations, token counts, model IDs and activity counts. Prompts, code, file paths and repository names stay on your machine.</p>
+  <div class="cmd-ref">
+    <div class="cmd-ref-item"><code class="il">agent-brain login</code><p>Signs in to the agent-brain platform. Add <code class="il">--no-browser</code> to print the approval URL instead of opening a browser.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain link &lt;project-key&gt;</code><p>Connects this project directory to a cloud project. Add <code class="il">--force</code> to rebind a directory that is linked to a different project. <code class="il">--auto</code> finds or creates a personal project named after the directory.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain consent</code><p>Shows or changes what agent-brain may send to the cloud.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain sync</code><p>Syncs queued sessions to the cloud now.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain unlink</code><p>Stops syncing this project directory. Local collection continues.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain logout</code><p>Signs out this machine, revokes its token and stops syncing. Local data is kept.</p></div>
+  </div>
+  <h3>Team memory</h3>
+  <p>Team memory syncs to the agent-brain cloud service, under a separate per-project consent. To share an org project's memory with the team, run <code class="il">agent-brain memory share</code>. Use <code class="il">agent-brain memory pause</code> and <code class="il">agent-brain memory resume</code> to stop and restart contributing. Entries can also be marked personal-only so they are never shared.</p>
+</section>
+
+<!-- ============================== STORAGE ============================== -->
+<section id="storage" aria-labelledby="storage-title">
+  <p class="eyebrow docs-eyebrow">Advanced</p>
+  <h2 id="storage-title">Storage backends</h2>
+  <p>The local store uses SQLite by default (Basic). <code class="il">agent-brain storage</code> inspects the backend and can switch it. Advanced uses PostgreSQL.</p>
+  <div class="cmd-ref">
+    <div class="cmd-ref-item"><code class="il">agent-brain storage</code><p>Inspects the local storage backend and can switch it.</p></div>
+  </div>
+  <p>For the tables the client creates and how long each one is kept, see <a href="#privacy">Privacy and data retention</a>.</p>
+</section>
+
+<!-- ============================== UPDATING ============================== -->
+<section id="updating" aria-labelledby="updating-title">
+  <p class="eyebrow docs-eyebrow">Maintenance</p>
+  <h2 id="updating-title">Updating</h2>
+  <p>agent-brain updates itself in the background by default. You can also run the commands yourself:</p>
+  <div class="cmd-ref">
+    <div class="cmd-ref-item"><code class="il">agent-brain update</code><p>Fetches the latest release and replaces the binary.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain update --check</code><p>Reports whether an update is available, then exits.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain update --auto on|notify|off</code><p>Sets automatic-update mode.</p></div>
+  </div>
+</section>
+
+<!-- ============================== UNINSTALL ============================== -->
+<section id="uninstall" aria-labelledby="uninstall-title">
+  <p class="eyebrow docs-eyebrow">Maintenance</p>
+  <h2 id="uninstall-title">Uninstall</h2>
+  <p><code class="il">agent-brain uninstall</code> removes the assistant integrations and keeps your local data. Pass <code class="il">--purge-data</code> to remove the data too. Then delete the binary.</p>
+  <div class="code-wrap">
+    <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy uninstall commands">Copy</button></div>
+    <pre><code>agent-brain uninstall                # removes integrations, keeps your data
+agent-brain uninstall --purge-data   # also removes the local data</code></pre>
+  </div>
+</section>
+
+<!-- ============================== PRIVACY ============================== -->
+<section id="privacy" aria-labelledby="privacy-title">
+  <p class="eyebrow docs-eyebrow">Data</p>
+  <h2 id="privacy-title">Privacy and data retention</h2>
+  <p>Everything is stored in a local SQLite database you own. Nothing leaves your machine unless you link a project and grant consent. The wire package defines every struct that can be serialized to the network. A guard test fails the build if a field for a local path, git remote, project name, hostname or message text appears there. A second guard test fails the build if memory content reaches a transport package.</p>
+  <p>Every local table is listed in the retention matrix, and a test fails the build if a migration adds a table that is not documented there. The main tables are:</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col">Table</th><th scope="col">Contents</th><th scope="col">Retention</th></tr></thead>
+      <tbody>
+        <tr><td><code class="il">sessions</code></td><td>Local session records awaiting or after sync</td><td>Kept locally until you clear it</td></tr>
+        <tr><td><code class="il">events</code></td><td>Local per-session event counters</td><td>Kept locally until you clear it</td></tr>
+        <tr><td><code class="il">projects</code></td><td>Local project link state</td><td>Kept locally until unlinked</td></tr>
+        <tr><td><code class="il">memories</code></td><td>Local personal memory store</td><td>Kept locally until you delete it</td></tr>
+        <tr><td><code class="il">memory_usage_events</code></td><td>Retrieval and citation counters. Syncs identifiers and counts only, never memory content</td><td>Kept locally until you clear it</td></tr>
+        <tr><td><code class="il">session_model_usage</code></td><td>Per-session token totals split by model</td><td>Kept locally until you clear it</td></tr>
+        <tr><td><code class="il">team_memories</code></td><td>Read-through cache of the team pool</td><td>Disposable cache, repopulated from the server</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>The full table, with legal basis for each row, is in <a href="https://github.com/ebrahim5801/agent-brain-cli/blob/main/docs/compliance/retention.md">docs/compliance/retention.md</a>.</p>
+  <p>To report a security issue, follow <a href="https://github.com/ebrahim5801/agent-brain-cli/blob/main/SECURITY.md">SECURITY.md</a>. Do not open a public issue.</p>
+</section>
+
+<!-- ============================== TROUBLESHOOTING ============================== -->
+<section id="troubleshooting" aria-labelledby="troubleshooting-title">
+  <p class="eyebrow docs-eyebrow">Help</p>
+  <h2 id="troubleshooting-title">Troubleshooting</h2>
+  <h3>Start with status</h3>
+  <p>Run <code class="il">agent-brain status</code>. It reports integration health and collection activity, one line per assistant.</p>
+  <div class="code-wrap">
+    <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy status command">Copy</button></div>
+    <pre><code>agent-brain status</code></pre>
+  </div>
+  <h3>Codex records nothing</h3>
+  <p>Codex will not run a hook until you approve it. Until you do, Codex records nothing and reports no error. After <code class="il">agent-brain install</code>, open <code class="il">codex</code>, run <code class="il">/hooks</code>, and trust the agent-brain entries. <code class="il">agent-brain status</code> shows the same reminder.</p>
+</section>
+
+<!-- ============================== FAQ ============================== -->
+<section id="faq" aria-labelledby="faq-title">
+  <p class="eyebrow docs-eyebrow">Help</p>
+  <h2 id="faq-title">FAQ</h2>
+  <div class="faq-list">
+    <details class="faq-item">
+      <summary>Does agent-brain read my code or my prompts?</summary>
+      <p>No. What can sync, and only after you opt in, is numbers: timestamps, durations, token counts, model IDs and activity counts. The wire protocol has no fields for prompts, code, file contents, file paths or repository names.</p>
+    </details>
+    <details class="faq-item">
+      <summary>How is memory different from what the assistant keeps?</summary>
+      <p>Memory is text the assistant distills at the end of a session: decisions, conventions and unfinished work. It is stored locally and served back at the start of the next session. Personal memory has no network transport. Team memory is the only case where memory text leaves a machine, and it needs its own consent.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Are the token numbers accurate?</summary>
+      <p>Where an assistant reports token usage (Claude Code and Gemini CLI, per the FAQ), you get full counts. Where it does not (Cursor reports only the model), agent-brain records the count as absent rather than estimating it.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Do I need an account?</summary>
+      <p>No, for collection and <code class="il">agent-brain stats</code>. Memory needs a Pro account or team membership, and the cloud dashboard is optional.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Does it slow my assistant down?</summary>
+      <p>The capture path writes to a local SQLite database and has no network capability. Cloud sync runs in a separate background service.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Can I keep a project out of sync?</summary>
+      <p>Yes. A project you never link transmits nothing. <code class="il">agent-brain memory disable</code> turns memory off for one project, or everywhere with <code class="il">--all</code>. On team projects, <code class="il">agent-brain memory pause</code> stops contributing while you keep receiving.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Can I self-host it?</summary>
+      <p>The CLI in this repository is entirely local. It needs no server and works fully offline. Cloud sync is optional. The hosted backend is a separate, closed-source product.</p>
+    </details>
+  </div>
+</section>
+
+  </div>
+</div>
+</div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-top">
+      <a class="brand" href="/">agent-brain</a>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/">Home</a>
+        <a href="https://github.com/ebrahim5801/agent-brain-cli">Source</a>
+        <a href="https://github.com/ebrahim5801/agent-brain-cli/blob/main/SECURITY.md">Security</a>
+        <a href="https://github.com/ebrahim5801/agent-brain-cli/blob/main/LICENSE">License</a>
+      </nav>
+    </div>
+    <p class="disclaimer">agent-brain is a local-first client. Security reports: follow <a href="https://github.com/ebrahim5801/agent-brain-cli/blob/main/SECURITY.md">SECURITY.md</a>. Licensed under the MIT License.</p>
+  </div>
+</footer>
+</body>
+</html>
