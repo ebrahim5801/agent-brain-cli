@@ -25,6 +25,12 @@ builds:
 
 archives:
   - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    # Same files as packaging/release, so both kinds of archive match.
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+      - CHANGELOG.md
     formats: [tar.gz]
     format_overrides:
       - goos: windows

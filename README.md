@@ -12,9 +12,34 @@ machine unless you explicitly link a project and grant consent.
 
 ## Install
 
-Clone the repository and run the installer. It checks the system requirements,
-builds the binary, installs it, and offers to wire up your assistants — no
-manual steps.
+One command installs the prebuilt binary — no Go needed:
+
+```sh
+curl -fsSL https://agentbrain.wecansync.com/install.sh | sh
+```
+
+On Windows, in PowerShell:
+
+```powershell
+irm https://agentbrain.wecansync.com/install.ps1 | iex
+```
+
+The installer downloads the binary for your OS and CPU (Linux, macOS, or
+Windows on amd64/arm64), checks it against the release's `checksums.txt`,
+installs it, and offers to run `agent-brain install` for your assistants. Set
+`AGENT_BRAIN_VERSION=0.1.0` to pin a version, `AGENT_BRAIN_BIN_DIR=DIR` to
+choose the folder, `AGENT_BRAIN_NO_INTEGRATE=1` to install the binary only, or
+`AGENT_BRAIN_YES=1` to integrate every detected assistant without asking. The
+full guide is at <https://agentbrain.wecansync.com/docs/>.
+
+`git` is optional but recommended — without it, memory entries are stored
+without git context.
+
+### From source
+
+Clone the repository and run the source installer. It checks the system
+requirements (Go 1.25 or newer, checked against `go.mod`), builds the binary,
+installs it, and offers to wire up your assistants.
 
 ```sh
 git clone https://github.com/ebrahim5801/agent-brain-cli.git
@@ -27,10 +52,6 @@ On Windows, run the PowerShell twin instead:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
-
-Requirements: Go 1.25 or newer (checked against `go.mod`), Linux, macOS, or
-Windows on amd64/arm64. `git` is optional but recommended — without it, memory
-entries are stored without git context.
 
 The binary goes to `~/.local/bin` (`%LOCALAPPDATA%\Programs\agent-brain` on
 Windows). Useful flags:
@@ -91,6 +112,13 @@ Entries are typed (`decision`, `convention`, `task_state`, `fact`), carry the
 git state they were captured at, and are ranked so stale ones are flagged rather
 than silently trusted.
 
+agent-brain asks the assistant to save memory after 10 tool calls of work since
+the last save (not after every reply), at a mid-task checkpoint every 25 tool
+calls, and before the context is compacted. The memory tools' own calls are not
+counted. `agent-brain memory capture` shows the settings; `--every N` and
+`--checkpoint N` change them (0 turns that trigger off, `--every 1` saves after
+every reply that used a tool), and `--reset` restores the defaults.
+
 ## Privacy
 
 The privacy boundary is enforced structurally, not by policy. The [`wire/`](wire/)
@@ -119,7 +147,8 @@ separate, closed-source product; this repository contains only the client.
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup, test suite, guard tests, PR expectations |
 | [SECURITY.md](SECURITY.md) | How to report a vulnerability |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
-| [LICENSE](LICENSE) / [NOTICE](NOTICE) | Business Source License 1.1 terms and attribution |
+| [LICENSE](LICENSE) / [NOTICE](NOTICE) | MIT License terms, name, and attribution |
+| [docs/releasing.md](docs/releasing.md) | Building a release and publishing it to agentbrain.wecansync.com |
 
 ## Building
 
@@ -137,7 +166,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Business Source License 1.1. You may use agent-brain freely, including
-commercially inside your own organization. You may not offer it to third
-parties as a hosted or managed agent-memory service. On 2030-08-18 it converts
-to Apache-2.0. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). The agent-brain name is covered by
+[NOTICE](NOTICE).

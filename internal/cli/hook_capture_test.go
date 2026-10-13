@@ -11,6 +11,7 @@ import (
 
 	"github.com/ebrahim5801/agent-brain-cli/internal/attribution"
 	"github.com/ebrahim5801/agent-brain-cli/internal/config"
+	"github.com/ebrahim5801/agent-brain-cli/internal/diag"
 	"github.com/ebrahim5801/agent-brain-cli/internal/entitlement"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
 )
@@ -424,6 +425,19 @@ func extractReason(t *testing.T, envelope string) string {
 	return ""
 }
 
+// setMemoryCapture writes memory_capture into the sandboxed config for one test.
+func setMemoryCapture(t *testing.T, every, checkpoint *int) {
+	t.Helper()
+	if _, err := config.Update(func(c *config.Config) error {
+		c.MemoryCapture = &config.MemoryCaptureConfig{Every: every, Checkpoint: checkpoint}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func intPtr(v int) *int { return &v }
+
 func TestDistillationFiresOncePerAssistant(t *testing.T) {
 	for _, tc := range []struct{ name, start, prompt, tool, stop string }{
 		{"cursor",
@@ -451,6 +465,7 @@ func TestDistillationFiresOncePerAssistant(t *testing.T) {
 			sandbox(t)
 			proj := t.TempDir()
 			enableMemoryForTest(t)
+			setMemoryCapture(t, intPtr(1), nil)
 
 			fill := func(s string) string { return strings.ReplaceAll(s, "%s", proj) }
 			hookWith(t, "session-start", tc.name, fill(tc.start))
@@ -474,6 +489,7 @@ func TestDistillationRearmsAfterNewPrompt(t *testing.T) {
 	sandbox(t)
 	proj := t.TempDir()
 	enableMemoryForTest(t)
+	setMemoryCapture(t, intPtr(1), nil)
 
 	hookWith(t, "session-start", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`"}`)
 	hookWith(t, "prompt", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`"}`)
@@ -490,6 +506,8 @@ func TestDistillationRearmsAfterNewPrompt(t *testing.T) {
 	// Timestamps have millisecond precision; step past the marker's instant.
 	time.Sleep(2 * time.Millisecond)
 	hookWith(t, "prompt", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`"}`)
+	// every=1 counts a reply that used a tool, so the new reply needs one.
+	hookWith(t, "tool-use", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`","tool_name":"edit"}`)
 
 	env = hookWith(t, "stop", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`"}`)
 	if got := extractReason(t, env); got != distillationReason {
@@ -497,6 +515,155 @@ func TestDistillationRearmsAfterNewPrompt(t *testing.T) {
 	}
 	if again := hookWith(t, "stop", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`"}`); again != "" {
 		t.Errorf("post-redistillation stop emitted %q, want empty", again)
+	}
+}
+
+// replyWith drives one reply: a prompt followed by n tool calls of the given name.
+func replyWith(t *testing.T, proj string, n int, tool string) {
+	t.Helper()
+	hookWith(t, "prompt", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+	for i := 0; i < n; i++ {
+		hookWith(t, "tool-use", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`","tool_name":"`+tool+`"}`)
+	}
+}
+
+func TestDistillationDefaultEveryAccumulatesAcrossReplies(t *testing.T) {
+	sandbox(t)
+	proj := t.TempDir()
+	enableMemoryForTest(t)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+
+	// Default every is 10: two 3-tool replies (6 total) must stay silent.
+	replyWith(t, proj, 3, "edit")
+	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`); env != "" {
+		t.Fatalf("stop after 3 tool calls emitted %q, want empty (below every)", env)
+	}
+	replyWith(t, proj, 3, "edit")
+	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`); env != "" {
+		t.Fatalf("stop after 6 tool calls emitted %q, want empty (below every)", env)
+	}
+	// The third and fourth replies cross 10 across replies: the save prompt fires.
+	replyWith(t, proj, 4, "edit")
+	env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+	if got := extractReason(t, env); got != distillationReason {
+		t.Fatalf("stop after 10 accumulated tool calls = %q, want the distillation prompt", got)
+	}
+	// The immediate post-distillation Stop passes through.
+	if again := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`); again != "" {
+		t.Errorf("post-distillation stop emitted %q, want empty", again)
+	}
+}
+
+func TestDistillationIgnoresMemoryServerToolCalls(t *testing.T) {
+	sandbox(t)
+	proj := t.TempDir()
+	enableMemoryForTest(t)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+
+	// Twelve memory-server calls must not arm an every=10 save.
+	replyWith(t, proj, 12, "mcp__agent-brain-memory__memory_save")
+	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`); env != "" {
+		t.Fatalf("memory-server-only reply emitted %q, want empty", env)
+	}
+}
+
+func TestDistillationEveryOneReproducesPerReplyGate(t *testing.T) {
+	sandbox(t)
+	proj := t.TempDir()
+	enableMemoryForTest(t)
+	setMemoryCapture(t, intPtr(1), nil)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+
+	replyWith(t, proj, 1, "edit")
+	env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+	if got := extractReason(t, env); got != distillationReason {
+		t.Fatalf("every=1 stop after one tool call = %q, want the distillation prompt", got)
+	}
+}
+
+func TestDistillationEveryZeroNeverPrompts(t *testing.T) {
+	sandbox(t)
+	proj := t.TempDir()
+	enableMemoryForTest(t)
+	setMemoryCapture(t, intPtr(0), nil)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+
+	replyWith(t, proj, 50, "edit")
+	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`); env != "" {
+		t.Errorf("every=0 stop emitted %q, want empty (off)", env)
+	}
+}
+
+func TestCheckpointZeroNeverCheckpoints(t *testing.T) {
+	sandbox(t)
+	proj := t.TempDir()
+	enableMemoryForTest(t)
+	setMemoryCapture(t, nil, intPtr(0))
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"c0","cwd":"`+proj+`"}`)
+	for i := 0; i < 40; i++ {
+		if env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"c0","cwd":"`+proj+`","tool_name":"edit"}`); env != "" {
+			t.Fatalf("checkpoint=0 tool-use %d emitted %q, want empty (off)", i, env)
+		}
+	}
+}
+
+func TestCheckpointIgnoresMemoryServerToolCalls(t *testing.T) {
+	sandbox(t)
+	proj := t.TempDir()
+	enableMemoryForTest(t)
+	setMemoryCapture(t, nil, intPtr(2))
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"cm","cwd":"`+proj+`"}`)
+	for i := 0; i < 5; i++ {
+		hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cm","cwd":"`+proj+`","tool_name":"mcp__agent-brain-memory__memory_save"}`)
+	}
+	if env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cm","cwd":"`+proj+`","tool_name":"edit"}`); env != "" {
+		t.Fatalf("one real call after memory calls checkpointed early: %q", env)
+	}
+	env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cm","cwd":"`+proj+`","tool_name":"edit"}`)
+	if got := extractReason(t, env); got != checkpointReason {
+		t.Fatalf("second real call reason = %q, want the checkpoint prompt", got)
+	}
+}
+
+func TestCheckpointConfiguredThresholdFires(t *testing.T) {
+	sandbox(t)
+	proj := t.TempDir()
+	enableMemoryForTest(t)
+	setMemoryCapture(t, nil, intPtr(4))
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"cc","cwd":"`+proj+`"}`)
+	for i := 0; i < 3; i++ {
+		if env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cc","cwd":"`+proj+`","tool_name":"edit"}`); env != "" {
+			t.Fatalf("tool-use %d emitted %q below configured checkpoint 4", i, env)
+		}
+	}
+	env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cc","cwd":"`+proj+`","tool_name":"edit"}`)
+	if got := extractReason(t, env); got != checkpointReason {
+		t.Errorf("fourth tool-use reason = %q, want the checkpoint prompt", got)
+	}
+}
+
+func TestPreCompactCheckpointStillFiresAtThresholdOne(t *testing.T) {
+	sandbox(t)
+	proj := t.TempDir()
+	enableMemoryForTest(t)
+	setMemoryCapture(t, nil, intPtr(25))
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"pc","cwd":"`+proj+`"}`)
+	hookWith(t, "tool-use", "gemini-cli", `{"session_id":"pc","cwd":"`+proj+`","tool_name":"edit"}`)
+
+	// The pre-compact path calls checkpointCapture with threshold 1 directly, so
+	// it must fire on one real call even when the tool-use trigger is at 25.
+	st := openTestStore(t)
+	var sessionID int64
+	if err := st.QueryRow(`SELECT id FROM sessions WHERE external_id = 'gemini-cli:pc'`).Scan(&sessionID); err != nil {
+		t.Fatal(err)
+	}
+	logger := &diag.Logger{}
+	projectID := int64(0)
+	if err := st.QueryRow(`SELECT project_id FROM sessions WHERE id = ?`, sessionID).Scan(&projectID); err != nil {
+		t.Fatal(err)
+	}
+	if got := checkpointCapture(st, logger, sessionID, projectID, 1); got != checkpointReason {
+		t.Errorf("pre-compact checkpoint at threshold 1 = %q, want the checkpoint prompt", got)
 	}
 }
 

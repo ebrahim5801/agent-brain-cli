@@ -142,14 +142,59 @@ type Config struct {
 	// offered again; local collection continues, and a later manual or --auto
 	// link clears the record.
 	LinkDeclines map[string]string `json:"link_declines,omitempty"`
-	Daemon       Daemon          `json:"daemon"`
-	Entitlement  *Entitlement    `json:"entitlement,omitempty"`
-	Storage      *Storage        `json:"storage,omitempty"`
-	Update       *UpdateConfig   `json:"update,omitempty"`
+	Daemon       Daemon            `json:"daemon"`
+	Entitlement  *Entitlement      `json:"entitlement,omitempty"`
+	Storage      *Storage          `json:"storage,omitempty"`
+	Update       *UpdateConfig     `json:"update,omitempty"`
 
 	// MemoryPackBudgetTokens bounds the session-start memory pack; 0 means
 	// the 2000-token default.
 	MemoryPackBudgetTokens int `json:"memory_pack_budget_tokens,omitempty"`
+
+	// MemoryCapture tunes when the automatic memory-capture prompts fire. Absent
+	// (or a field absent) means the defaults below.
+	MemoryCapture *MemoryCaptureConfig `json:"memory_capture,omitempty"`
+}
+
+// Defaults for the automatic memory-capture triggers.
+const (
+	// DefaultMemoryEvery is the number of real tool calls since the last
+	// distillation that arms the end-of-reply save prompt.
+	DefaultMemoryEvery = 10
+	// DefaultMemoryCheckpoint is the number of real tool calls since the last
+	// checkpoint that arms the mid-task checkpoint prompt.
+	DefaultMemoryCheckpoint = 25
+)
+
+// MemoryCaptureConfig holds the capture-trigger thresholds. A nil field means
+// the default; an explicit 0 turns that trigger off. Pointers keep "absent" and
+// "0" distinct in the JSON.
+type MemoryCaptureConfig struct {
+	Every      *int `json:"every,omitempty"`      // end-of-reply save: real tool calls per save
+	Checkpoint *int `json:"checkpoint,omitempty"` // mid-task checkpoint: real tool calls per checkpoint
+}
+
+// MemoryEvery returns the end-of-reply threshold: DefaultMemoryEvery when unset,
+// 0 when off. A negative stored value is treated as unset.
+func (c *Config) MemoryEvery() int {
+	return c.memoryCaptureValue(func(m *MemoryCaptureConfig) *int { return m.Every }, DefaultMemoryEvery)
+}
+
+// MemoryCheckpoint returns the mid-task threshold, falling back to def when the
+// value is unset (def lets callers and tests supply their own default). 0 is
+// off; a negative stored value is treated as unset.
+func (c *Config) MemoryCheckpoint(def int) int {
+	return c.memoryCaptureValue(func(m *MemoryCaptureConfig) *int { return m.Checkpoint }, def)
+}
+
+func (c *Config) memoryCaptureValue(field func(*MemoryCaptureConfig) *int, def int) int {
+	if c == nil || c.MemoryCapture == nil {
+		return def
+	}
+	if v := field(c.MemoryCapture); v != nil && *v >= 0 {
+		return *v
+	}
+	return def
 }
 
 func (c *Config) SignedIn() bool {

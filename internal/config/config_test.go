@@ -137,6 +137,48 @@ func TestMemoryFieldsRoundTrip(t *testing.T) {
 	}
 }
 
+func TestMemoryCaptureRoundTripAndDefaults(t *testing.T) {
+	setDir(t)
+	// Absent block: both triggers use their defaults.
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.MemoryEvery(); got != DefaultMemoryEvery {
+		t.Errorf("absent every = %d, want %d", got, DefaultMemoryEvery)
+	}
+	if got := cfg.MemoryCheckpoint(25); got != 25 {
+		t.Errorf("absent checkpoint = %d, want 25", got)
+	}
+
+	// Explicit values, including 0 (off), survive a round trip and are not
+	// confused with absent.
+	zero, seven := 0, 7
+	if _, err := Update(func(c *Config) error {
+		c.MemoryCapture = &MemoryCaptureConfig{Every: &zero, Checkpoint: &seven}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.MemoryEvery(); got != 0 {
+		t.Errorf("stored every 0 = %d, want 0 (off)", got)
+	}
+	if got := cfg.MemoryCheckpoint(25); got != 7 {
+		t.Errorf("stored checkpoint = %d, want 7", got)
+	}
+
+	// A negative stored value reads as unset.
+	neg := -3
+	cfg.MemoryCapture.Every = &neg
+	if got := cfg.MemoryEvery(); got != DefaultMemoryEvery {
+		t.Errorf("negative every = %d, want default %d", got, DefaultMemoryEvery)
+	}
+}
+
 func TestLinkMemoryEndpointRoundTrip(t *testing.T) {
 	setDir(t)
 	if _, err := Update(func(c *Config) error {

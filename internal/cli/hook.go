@@ -6,12 +6,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/ebrahim5801/agent-brain-cli/internal/assistant"
 	"github.com/ebrahim5801/agent-brain-cli/internal/assistant/claude"
 	"github.com/ebrahim5801/agent-brain-cli/internal/attribution"
 	"github.com/ebrahim5801/agent-brain-cli/internal/diag"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
+	"github.com/spf13/cobra"
 )
 
 func newHookCmd() *cobra.Command {
@@ -171,7 +171,8 @@ func runHook(event, assistantName string) (stdout string) {
 		// memory_checkpointed_at and burn the re-arm baseline with nothing
 		// emitted.
 		if mr, ok := adapter.(assistant.MidTurnResponder); ok {
-			if reason := checkpointCapture(st, logger, sessionID, projectID, checkpointToolThreshold); reason != "" {
+			_, checkpoint := captureThresholds(logger)
+			if reason := checkpointCapture(st, logger, sessionID, projectID, checkpoint); reason != "" {
 				stdout = mr.MidTurnResponse(reason)
 			}
 		}

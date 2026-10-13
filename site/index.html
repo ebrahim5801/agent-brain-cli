@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agent-brain — local stats and memory for AI coding assistants</title>
+<meta name="description" content="agent-brain records how you use Claude Code, Cursor, GitHub Copilot CLI, Gemini CLI, OpenCode and Codex CLI, locally and offline. Install with one command on macOS, Linux or Windows.">
+<meta property="og:title" content="agent-brain">
+<meta property="og:description" content="Local stats and memory for AI coding assistants. One command to install. Stats are free, local and offline.">
+<meta property="og:type" content="website">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<script src="/assets/theme.js"></script>
+<script src="/assets/site.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="#0d9488"/><g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"><path d="M10 10 L16 16 L22 10"/><path d="M16 16 L16 23"/></g><g fill="#ffffff"><circle cx="10" cy="10" r="2.6"/><circle cx="22" cy="10" r="2.6"/><circle cx="16" cy="16" r="3"/><circle cx="16" cy="23" r="2.6"/></g></svg>
+      agent-brain
+    </a>
+    <nav class="main-nav" id="primary-nav" data-main-nav aria-label="Primary">
+      <a href="#features">Features</a>
+      <a href="#assistants">Assistants</a>
+      <a href="#quick-start">Quick start</a>
+      <a href="#plans">Free vs Pro</a>
+      <a href="#faq">FAQ</a>
+      <a href="/docs/">Docs</a>
+      <a href="https://github.com/ebrahim5801/agent-brain-cli">GitHub</a>
+    </nav>
+    <div class="header-actions">
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle dark mode">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v3M12 18.5v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+      </button>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="primary-nav" aria-label="Toggle navigation menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ============================== HERO ============================== -->
+<section class="hero">
+  <div class="container hero-grid">
+    <div>
+      <p class="eyebrow">Local stats and memory for AI coding assistants</p>
+      <h1>See what your AI assistants really cost, and let them remember</h1>
+      <p class="lede">agent-brain runs on your machine. It records sessions, tokens and cost across your coding assistants, and gives them project memory they can search and save. Nothing leaves your machine unless you link a project and consent.</p>
+      <p class="latest-badge"><span class="latest-badge-version" data-latest-version>v0.1.0</span> <span aria-hidden="true">&middot;</span> <a href="/docs/#updating">Updating</a></p>
+
+      <div class="tabs" id="install-tabs">
+        <div role="tablist" aria-label="Operating system">
+          <button role="tab" id="tab-unix" aria-controls="panel-unix">macOS and Linux</button>
+          <button role="tab" id="tab-win" aria-controls="panel-win">Windows</button>
+        </div>
+        <div role="tabpanel" id="panel-unix" aria-labelledby="tab-unix">
+          <p class="panel-label">macOS and Linux</p>
+          <div class="code-wrap">
+            <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy macOS and Linux install command">Copy</button></div>
+            <pre><code>curl -fsSL https://agentbrain.wecansync.com/install.sh | sh</code></pre>
+          </div>
+        </div>
+        <div role="tabpanel" id="panel-win" aria-labelledby="tab-win">
+          <p class="panel-label">Windows PowerShell</p>
+          <div class="code-wrap">
+            <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy Windows install command">Copy</button></div>
+            <pre><code>irm https://agentbrain.wecansync.com/install.ps1 | iex</code></pre>
+          </div>
+        </div>
+      </div>
+      <ul class="hero-notes">
+        <li>No Go needed. Runs on Linux, macOS and Windows, on amd64 or arm64.</li>
+        <li>Stats are free, local, offline, and need no account.</li>
+      </ul>
+    </div>
+
+    <div class="hero-visual">
+      <div class="terminal" role="img" aria-label="Terminal showing agent-brain stats output">
+        <div class="terminal-bar" aria-hidden="true"><span></span><span></span><span></span></div>
+        <pre class="terminal-body"><span class="prompt">$</span> agent-brain stats
+<span class="muted"># sessions, time and tokens per project</span>
+
+<span class="prompt">$</span> agent-brain stats --sessions
+<span class="muted"># per-session breakdown</span>
+
+<span class="prompt">$</span> agent-brain status
+<span class="muted"># integration health and collection activity</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== WHAT IT DOES ============================== -->
+<section class="section" id="features" aria-labelledby="features-title">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">What it does</p>
+      <h2 id="features-title">Usage you can see, and memory your assistants keep</h2>
+      <p>agent-brain is a local collector and memory store for your AI coding assistants. It works offline and keeps its database on your machine.</p>
+    </div>
+    <div class="features-grid">
+      <article class="feature-card">
+        <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+        <h3>Stats</h3>
+        <p>Run <code class="il">agent-brain stats</code> to see token usage and cost by day, project and model. Add <code class="il">--sessions</code> for a per-session breakdown. Free, local and offline.</p>
+      </article>
+      <article class="feature-card">
+        <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3a3 3 0 0 0-3 3v1a3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3zM15 3a3 3 0 0 1 3 3v1a3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-3 3 3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z"/></svg></span>
+        <h3>Memory (Pro)</h3>
+        <p>Assistants get <code class="il">memory_search</code> and <code class="il">memory_save</code> tools over MCP, plus project memory injected at session start. Entries are typed as decisions, conventions, task state or facts.</p>
+      </article>
+      <article class="feature-card">
+        <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+        <h3>Privacy</h3>
+        <p>Everything is stored in a local SQLite database you own. Nothing leaves your machine unless you link a project and grant consent. The wire format has no fields for local paths, git remotes, project names, hostnames or message text, and a guard test enforces this.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== ASSISTANTS ============================== -->
+<section class="section section-alt" id="assistants" aria-labelledby="assistants-title">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Supported assistants</p>
+      <h2 id="assistants-title">One install covers them all</h2>
+      <p><code class="il">agent-brain install</code> detects the assistants on your machine and integrates each one. Existing settings are kept, and a timestamped backup is written first. To integrate only some, pass <code class="il">--assistant</code> once per assistant.</p>
+    </div>
+    <ul class="assistant-list" aria-label="Supported assistants">
+      <li>Claude Code</li>
+      <li>Cursor</li>
+      <li>GitHub Copilot CLI</li>
+      <li>Gemini CLI</li>
+      <li>OpenCode</li>
+      <li>Codex CLI</li>
+    </ul>
+    <div class="callout note">
+      <span class="callout-label">Codex CLI</span>
+      <p>Codex needs its hooks trusted once. Open <code class="il">codex</code>, run <code class="il">/hooks</code>, and trust the agent-brain entries. Until you do, Codex records nothing and reports no error. <code class="il">agent-brain status</code> shows the same reminder.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== QUICK START ============================== -->
+<section class="section" id="quick-start" aria-labelledby="quick-start-title">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Quick start</p>
+      <h2 id="quick-start-title">Three steps</h2>
+      <p>No Go toolchain is needed. The installer downloads a prebuilt binary, checks its SHA-256 checksum, and then offers to set up your assistants.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <h3>Install</h3>
+        <p>Run the one-liner for your platform from the top of this page. Pin a version with <code class="il">AGENT_BRAIN_VERSION</code>, or skip assistant setup with <code class="il">AGENT_BRAIN_NO_INTEGRATE=1</code>.</p>
+      </div>
+      <div class="step">
+        <h3>Verify</h3>
+        <p>Run <code class="il">agent-brain status</code>. You get one line per assistant showing whether it is detected and integrated, plus the database location and the last captured event.</p>
+      </div>
+      <div class="step">
+        <h3>See your stats</h3>
+        <p>Use any assistant as usual, then run <code class="il">agent-brain stats</code>. Every session is captured automatically and attributed to its project, with no extra setup.</p>
+      </div>
+    </div>
+    <div class="btn-row quickstart-cta">
+      <a class="btn btn-primary" href="/docs/#install">Full install guide</a>
+      <a class="btn btn-secondary" href="/docs/#verify">Verify and stats</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== FREE VS PRO ============================== -->
+<section class="section section-alt" id="plans" aria-labelledby="plans-title">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Free vs Pro</p>
+      <h2 id="plans-title">What is free, and what needs an account</h2>
+      <p>The local tool is free and needs no account. Memory needs Pro, and the cloud dashboard is optional.</p>
+    </div>
+    <div class="plan-grid">
+      <article class="plan-card">
+        <span class="plan-tag">Free</span>
+        <h3>Local collection and stats</h3>
+        <ul>
+          <li>Session capture for every supported assistant</li>
+          <li><code class="il">agent-brain stats</code> and <code class="il">agent-brain status</code></li>
+          <li>Local, offline, no account</li>
+        </ul>
+      </article>
+      <article class="plan-card">
+        <span class="plan-tag">Pro</span>
+        <h3>Memory, and the optional cloud dashboard</h3>
+        <ul>
+          <li>Memory tools (<code class="il">memory_search</code>, <code class="il">memory_save</code>) and session-start memory injection</li>
+          <li>Available with a Pro account (<code class="il">agent-brain login</code>) or through membership of a paying team's project</li>
+          <li>The cloud dashboard is optional: <code class="il">agent-brain login</code>, then <code class="il">agent-brain link &lt;project-key&gt;</code>, then consent</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== FAQ ============================== -->
+<section class="section" id="faq" aria-labelledby="faq-title">
+  <div class="container container-narrow">
+    <p class="eyebrow">FAQ</p>
+    <h2 id="faq-title">Questions</h2>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary>Does agent-brain read my code or my prompts?</summary>
+        <p>No, and the protection is built into the code, not left to policy. What can sync, and only after you opt in, is numbers: timestamps, durations, token counts, model IDs and activity counts. The wire format has no fields for prompts, code, file contents, paths or repository names.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Do I need an account?</summary>
+        <p>No. Collection, <code class="il">agent-brain stats</code> and <code class="il">agent-brain status</code> are local and need no account. Memory needs a Pro account or team membership, and the cloud dashboard is optional.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Does it slow my assistant down?</summary>
+        <p>The capture path writes to a local SQLite database and has no network capability, so recording never waits on a server. Cloud sync runs in a separate background service.</p>
+      </details>
+      <details class="faq-item">
+        <summary>How is memory captured?</summary>
+        <p>agent-brain asks the assistant to save memory after 10 tool calls of work since the last save, with a mid-task checkpoint every 25 tool calls, and before the context is compacted. Run <code class="il">agent-brain memory capture</code> to see the settings.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Can I stop it, or remove it?</summary>
+        <p>Yes. <code class="il">agent-brain uninstall</code> removes the assistant integrations and keeps your local data unless you pass <code class="il">--purge-data</code>. Then delete the binary. See the <a href="/docs/#uninstall">uninstall steps</a>.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Which license does it use?</summary>
+        <p>The repository is under the MIT License. See the <a href="https://github.com/ebrahim5801/agent-brain-cli/blob/main/LICENSE">LICENSE file</a>.</p>
+      </details>
+    </div>
+    <p class="text-muted">More questions are answered in the <a href="/docs/#faq">docs</a>.</p>
+  </div>
+</section>
+
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-top">
+      <a class="brand" href="/">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="#0d9488"/><g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"><path d="M10 10 L16 16 L22 10"/><path d="M16 16 L16 23"/></g><g fill="#ffffff"><circle cx="10" cy="10" r="2.6"/><circle cx="22" cy="10" r="2.6"/><circle cx="16" cy="16" r="3"/><circle cx="16" cy="23" r="2.6"/></g></svg>
+        agent-brain
+      </a>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/docs/">Docs</a>
+        <a href="https://github.com/ebrahim5801/agent-brain-cli">Source</a>
+        <a href="https://github.com/ebrahim5801/agent-brain-cli/blob/main/SECURITY.md">Security</a>
+        <a href="https://github.com/ebrahim5801/agent-brain-cli/blob/main/LICENSE">License</a>
+      </nav>
+    </div>
+    <p class="disclaimer">agent-brain is a local-first client. Security reports: follow <a href="https://github.com/ebrahim5801/agent-brain-cli/blob/main/SECURITY.md">SECURITY.md</a>. Licensed under the MIT License.</p>
+  </div>
+</footer>
+</body>
+</html>
