@@ -47,6 +47,25 @@ func TestWorkflowsPinExactGoPatchVersion(t *testing.T) {
 	}
 }
 
+// The vuln job scans the standard library of the Go it runs on, so that has to
+// be the Go the release builds with. Bumping one workflow and not the other
+// leaves CI green while the shipped binaries keep the vulnerable stdlib.
+func TestWorkflowsAgreeOnGoVersion(t *testing.T) {
+	seen := map[string]string{}
+	for _, f := range workflows(t) {
+		body, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range goVersionPin.FindAllStringSubmatch(string(body), -1) {
+			seen[m[1]] = filepath.Base(f)
+		}
+	}
+	if len(seen) > 1 {
+		t.Errorf("workflows pin different Go versions: %v", seen)
+	}
+}
+
 // Tools the workflows fetch must name an exact version too. `govulncheck@latest`
 // broke the private mirror's pipeline outright the day x/vuln v1.8.0 raised its
 // go directive past the pinned toolchain; here the same drift is quieter and
