@@ -4,9 +4,8 @@ Thanks for your interest. A few things worth knowing before you open a PR.
 
 ## License
 
-agent-brain is under the Business Source License 1.1, not an OSI-approved open
-source license. By contributing you agree your contribution is licensed under
-the same terms.
+agent-brain is under the MIT License. By contributing you agree your
+contribution is licensed under the same terms.
 
 ## Ground rules
 

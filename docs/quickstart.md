@@ -6,9 +6,18 @@ guide — if you want to develop agent-brain itself, see
 
 ## 1. Install
 
-Clone the repository and run the installer (requires Go 1.25+). It checks the
-system requirements, builds the binary, installs it to `~/.local/bin`, and
-offers to run `agent-brain install` for you:
+Run the one-line installer. It downloads the prebuilt binary for your OS and
+CPU, checks its SHA-256 checksum, installs it to `~/.local/bin`, and offers to
+run `agent-brain install` for you. No Go toolchain is needed:
+
+```sh
+curl -fsSL https://agentbrain.wecansync.com/install.sh | sh
+```
+
+On Windows, in PowerShell: `irm https://agentbrain.wecansync.com/install.ps1 | iex`
+(it installs to `%LOCALAPPDATA%\Programs\agent-brain`).
+
+To build from source instead (requires Go 1.25+):
 
 ```sh
 git clone https://github.com/ebrahim5801/agent-brain-cli.git
@@ -17,8 +26,8 @@ cd agent-brain-cli
 ```
 
 On Windows use `powershell -ExecutionPolicy Bypass -File .\install.ps1`. See the
-[README](../README.md#install) for the installer's flags. To skip the script
-entirely:
+[README](../README.md#install) for both installers' options. To skip the
+scripts entirely:
 
 ```sh
 go install github.com/ebrahim5801/agent-brain-cli/cmd/agent-brain@latest
