@@ -642,6 +642,44 @@ func TestCheckpointConfiguredThresholdFires(t *testing.T) {
 	}
 }
 
+// A Claude Code hook that fires inside a subagent carries agent_id. Those tool
+// calls belong to the subagent: a checkpoint emitted on one would interrupt the
+// subagent, and they must not count toward the parent's threshold either.
+func TestCheckpointSkipsSubagentToolCalls(t *testing.T) {
+	sandbox(t)
+	proj := t.TempDir()
+	enableMemoryForTest(t)
+	setMemoryCapture(t, nil, intPtr(3))
+	hookWith(t, "session-start", "claude-code", `{"session_id":"sa","cwd":"`+proj+`"}`)
+	for i := 0; i < 10; i++ {
+		if env := hookWith(t, "tool-use", "claude-code", `{"session_id":"sa","cwd":"`+proj+`","tool_name":"Edit","agent_id":"a1b2c3"}`); env != "" {
+			t.Fatalf("subagent tool-use %d emitted %q, want empty", i, env)
+		}
+	}
+	for i := 0; i < 2; i++ {
+		if env := hookWith(t, "tool-use", "claude-code", `{"session_id":"sa","cwd":"`+proj+`","tool_name":"Edit"}`); env != "" {
+			t.Fatalf("parent tool-use %d emitted %q: subagent calls counted toward the threshold", i, env)
+		}
+	}
+	env := hookWith(t, "tool-use", "claude-code", `{"session_id":"sa","cwd":"`+proj+`","tool_name":"Edit"}`)
+	if got := extractReason(t, env); got != checkpointReason {
+		t.Fatalf("third parent tool-use reason = %q, want the checkpoint prompt", got)
+	}
+
+	st := openTestStore(t)
+	var sub, own int
+	if err := st.QueryRow(`SELECT
+	        COUNT(CASE WHEN e.kind = 'subagent_tool_use' THEN 1 END),
+	        COUNT(CASE WHEN e.kind = 'tool_use' THEN 1 END)
+	    FROM events e JOIN sessions s ON s.id = e.session_id
+	    WHERE s.external_id = 'sa'`).Scan(&sub, &own); err != nil {
+		t.Fatal(err)
+	}
+	if sub != 10 || own != 3 {
+		t.Errorf("events: subagent_tool_use=%d tool_use=%d, want 10 and 3", sub, own)
+	}
+}
+
 func TestPreCompactCheckpointStillFiresAtThresholdOne(t *testing.T) {
 	sandbox(t)
 	proj := t.TempDir()

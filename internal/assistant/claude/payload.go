@@ -17,6 +17,9 @@ type Payload struct {
 	TranscriptPath string `json:"transcript_path"`
 	HookEventName  string `json:"hook_event_name"`
 	ToolName       string `json:"tool_name"`
+	// AgentID is set on hooks that fire inside a subagent (and on SubagentStop,
+	// where it names the finished subagent); the main conversation omits it.
+	AgentID string `json:"agent_id"`
 }
 
 func ParsePayload(r io.Reader) (Payload, error) {

@@ -35,3 +35,12 @@ contains the client only, extracted with its full functionality intact.
 - The memory tools' own calls (`mcp__agent-brain-memory__*`) no longer count
   towards either trigger.
 - License: MIT (was Business Source License 1.1).
+
+### Fixed
+
+- Claude Code subagents no longer receive the mid-task memory checkpoint.
+  Their tool calls arrive on the parent session's hooks with an `agent_id`;
+  agent-brain counted them toward the parent's thresholds and answered with
+  the checkpoint, which landed inside the subagent and cost it an extra
+  memory-saving round. They are now recorded as `subagent_tool_use` events,
+  count toward neither trigger, and are never answered.

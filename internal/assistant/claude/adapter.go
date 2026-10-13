@@ -70,6 +70,9 @@ func (Adapter) ParseHook(event string, r io.Reader) (assistant.HookInput, error)
 		Cwd:            p.Cwd,
 		TranscriptPath: p.TranscriptPath,
 		ToolName:       p.ToolName,
+		// SubagentStop always carries the finished subagent's agent_id but
+		// fires in the parent conversation, so it is not "from" the subagent.
+		FromSubagent: p.AgentID != "" && event != assistant.EventSubagentStop,
 	}, nil
 }
 

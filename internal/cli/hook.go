@@ -165,6 +165,14 @@ func runHook(event, assistantName string) (stdout string) {
 			stdout = pr.PromptResponse()
 		}
 	case assistant.EventToolUse:
+		if input.FromSubagent {
+			// A subagent's tool call: kept in the local event log under its own
+			// kind so no capture gate counts it, and never answered with a
+			// checkpoint or injection — that would interrupt the subagent and
+			// does not protect the parent's context, which the call never grew.
+			appendEvent(st, logger, sessionID, "subagent_tool_use", input.ToolName, at)
+			break
+		}
 		appendEvent(st, logger, sessionID, "tool_use", input.ToolName, at)
 		// Only claim a checkpoint for an adapter that can actually push the
 		// prompt back to the model mid-turn; otherwise the claim would advance
