@@ -390,13 +390,26 @@ func (s *Store) ProjectMemoryDisabled(projectID int64) (bool, error) {
 	return bool(disabled), err
 }
 
-// MarkSessionDistilled claims a distillation pass for a session. The gate
-// re-arms when a prompt event arrived after the last distillation (the
-// distillation continuation emits tool_use but never prompt, so the Stop right
-// after a distillation still passes through). It reports false when there is
-// nothing new to distill, so concurrent Stop hooks race safely: exactly one
-// caller wins per arming.
-func (s *Store) MarkSessionDistilled(sessionID int64, at string) (bool, error) {
+// MemoryToolPrefix is the tool-name prefix of the memory MCP server's own tools
+// (mcp__<server>__<tool>, server "agent-brain-memory"). Calls to those tools are
+// agent-brain's own bookkeeping, not work, so the capture gates never count
+// them. Kept in step with claude.MCPServerName by a cli test.
+const MemoryToolPrefix = "mcp__agent-brain-memory__"
+
+// realToolUseClause restricts an events alias to real tool calls: tool_use
+// events whose detail (the tool name) is not a memory-server tool. The prefix is
+// compared with substr rather than LIKE so "_" is not a wildcard.
+const realToolUseClause = `e.kind = 'tool_use' AND (e.detail IS NULL OR substr(e.detail, 1, ?) <> ?)`
+
+// MarkSessionDistilled claims a distillation pass for a session. It fires only
+// when at least every real tool calls have occurred since the last distillation
+// (from session start before the first one), and a prompt arrived since the last
+// distillation (the distillation continuation emits tool_use but never prompt, so
+// the Stop right after a distillation still passes through). When the threshold
+// is not met nothing is claimed, so tool calls keep accumulating across replies.
+// It reports false when there is nothing new to distill, so concurrent Stop
+// hooks race safely: exactly one caller wins per arming.
+func (s *Store) MarkSessionDistilled(sessionID int64, at string, every int) (bool, error) {
 	res, err := s.Exec(`
         UPDATE sessions SET memory_distilled_at = ?
         WHERE id = ?
@@ -404,7 +417,13 @@ func (s *Store) MarkSessionDistilled(sessionID int64, at string) (bool, error) {
                OR EXISTS (SELECT 1 FROM events e
                           WHERE e.session_id = sessions.id
                             AND e.kind = 'prompt'
-                            AND e.occurred_at > sessions.memory_distilled_at))`, at, sessionID)
+                            AND e.occurred_at > sessions.memory_distilled_at))
+          AND (SELECT COUNT(*) FROM events e
+               WHERE e.session_id = sessions.id
+                 AND `+realToolUseClause+`
+                 AND (sessions.memory_distilled_at IS NULL
+                      OR e.occurred_at > sessions.memory_distilled_at))  >= ?`,
+		at, sessionID, len(MemoryToolPrefix), MemoryToolPrefix, every)
 	if err != nil {
 		return false, err
 	}
@@ -413,21 +432,21 @@ func (s *Store) MarkSessionDistilled(sessionID int64, at string) (bool, error) {
 }
 
 // MarkSessionCheckpointed claims a mid-session checkpoint for a session when at
-// least threshold tool_use events have occurred since the last checkpoint (or
-// ever, if none yet). Like MarkSessionDistilled it is an atomic conditional
-// UPDATE, so concurrent tool-use hooks race safely: exactly one caller wins per
-// arming. threshold 1 (used for pre-compact) fires whenever any tool_use has
-// happened since the last checkpoint.
+// least threshold real tool calls (memory-server tools excluded) have occurred
+// since the last checkpoint (or ever, if none yet). Like MarkSessionDistilled it
+// is an atomic conditional UPDATE, so concurrent tool-use hooks race safely:
+// exactly one caller wins per arming. threshold 1 (used for pre-compact) fires
+// whenever any real tool_use has happened since the last checkpoint.
 func (s *Store) MarkSessionCheckpointed(sessionID int64, at string, threshold int) (bool, error) {
 	res, err := s.Exec(`
         UPDATE sessions SET memory_checkpointed_at = ?
         WHERE id = ?
           AND (SELECT COUNT(*) FROM events e
                WHERE e.session_id = sessions.id
-                 AND e.kind = 'tool_use'
+                 AND `+realToolUseClause+`
                  AND (sessions.memory_checkpointed_at IS NULL
                       OR e.occurred_at > sessions.memory_checkpointed_at)) >= ?`,
-		at, sessionID, threshold)
+		at, sessionID, len(MemoryToolPrefix), MemoryToolPrefix, threshold)
 	if err != nil {
 		return false, err
 	}

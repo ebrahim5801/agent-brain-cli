@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/ebrahim5801/agent-brain-cli/internal/attribution"
 	"github.com/ebrahim5801/agent-brain-cli/internal/gitstate"
 	"github.com/ebrahim5801/agent-brain-cli/internal/memory"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
+	"github.com/spf13/cobra"
 )
 
 // cliGitBudget bounds git subprocess time when the CLI renders freshness;
@@ -42,6 +42,7 @@ func newMemoryCmd() *cobra.Command {
 		newMemoryShareCmd(),
 		newMemoryPauseCmd(),
 		newMemoryResumeCmd(),
+		newMemoryCaptureCmd(),
 	)
 	return cmd
 }

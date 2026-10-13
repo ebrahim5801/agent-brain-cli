@@ -361,11 +361,12 @@ func TestPendingContributionCarriesMultipleSupersedes(t *testing.T) {
 
 func TestMarkSessionDistilledOnce(t *testing.T) {
 	st, _, sessionID := openMemStore(t)
-	first, err := st.MarkSessionDistilled(sessionID, Now())
+	_ = st.AppendEvent(sessionID, "tool_use", "Edit", "2026-01-01T00:00:00.000Z")
+	first, err := st.MarkSessionDistilled(sessionID, Now(), 1)
 	if err != nil || !first {
 		t.Fatalf("first mark = %v, %v", first, err)
 	}
-	second, err := st.MarkSessionDistilled(sessionID, Now())
+	second, err := st.MarkSessionDistilled(sessionID, Now(), 1)
 	if err != nil || second {
 		t.Errorf("second mark = %v, %v (must lose the race)", second, err)
 	}
@@ -373,7 +374,10 @@ func TestMarkSessionDistilledOnce(t *testing.T) {
 
 func TestMarkSessionDistilledRearmsAfterPrompt(t *testing.T) {
 	st, _, sessionID := openMemStore(t)
-	first, err := st.MarkSessionDistilled(sessionID, "2026-01-01T00:00:00.000Z")
+	if err := st.AppendEvent(sessionID, "tool_use", "Edit", "2026-01-01T00:00:00.000Z"); err != nil {
+		t.Fatal(err)
+	}
+	first, err := st.MarkSessionDistilled(sessionID, "2026-01-01T00:00:00.500Z", 1)
 	if err != nil || !first {
 		t.Fatalf("first mark = %v, %v", first, err)
 	}
@@ -381,7 +385,7 @@ func TestMarkSessionDistilledRearmsAfterPrompt(t *testing.T) {
 	if err := st.AppendEvent(sessionID, "tool_use", "Edit", "2026-01-01T00:00:01.000Z"); err != nil {
 		t.Fatal(err)
 	}
-	again, err := st.MarkSessionDistilled(sessionID, "2026-01-01T00:00:02.000Z")
+	again, err := st.MarkSessionDistilled(sessionID, "2026-01-01T00:00:02.000Z", 1)
 	if err != nil || again {
 		t.Errorf("mark after tool_use only = %v, %v (must not re-arm)", again, err)
 	}
@@ -389,14 +393,47 @@ func TestMarkSessionDistilledRearmsAfterPrompt(t *testing.T) {
 	if err := st.AppendEvent(sessionID, "prompt", "", "2026-01-01T00:00:03.000Z"); err != nil {
 		t.Fatal(err)
 	}
-	rearmed, err := st.MarkSessionDistilled(sessionID, "2026-01-01T00:00:04.000Z")
+	rearmed, err := st.MarkSessionDistilled(sessionID, "2026-01-01T00:00:04.000Z", 1)
 	if err != nil || !rearmed {
 		t.Fatalf("mark after new prompt = %v, %v (must re-arm)", rearmed, err)
 	}
 
-	final, err := st.MarkSessionDistilled(sessionID, "2026-01-01T00:00:05.000Z")
+	final, err := st.MarkSessionDistilled(sessionID, "2026-01-01T00:00:05.000Z", 1)
 	if err != nil || final {
 		t.Errorf("mark with no newer prompt = %v, %v (must lose)", final, err)
+	}
+}
+
+func TestMarkSessionDistilledEveryThreshold(t *testing.T) {
+	st, _, sessionID := openMemStore(t)
+	if err := st.AppendEvent(sessionID, "prompt", "", "2026-01-01T00:00:00.000Z"); err != nil {
+		t.Fatal(err)
+	}
+	// Two real tool calls against every=3: not enough, nothing claimed.
+	_ = st.AppendEvent(sessionID, "tool_use", "Edit", "2026-01-01T00:00:01.000Z")
+	_ = st.AppendEvent(sessionID, "tool_use", "Bash", "2026-01-01T00:00:02.000Z")
+	if won, err := st.MarkSessionDistilled(sessionID, "2026-01-01T00:00:03.000Z", 3); err != nil || won {
+		t.Fatalf("below every mark = %v, %v (must not claim)", won, err)
+	}
+	// The third crosses it: claim, and the marker advances.
+	_ = st.AppendEvent(sessionID, "tool_use", "Read", "2026-01-01T00:00:04.000Z")
+	if won, err := st.MarkSessionDistilled(sessionID, "2026-01-01T00:00:05.000Z", 3); err != nil || !won {
+		t.Fatalf("at every mark = %v, %v (must claim)", won, err)
+	}
+}
+
+func TestMarkSessionDistilledIgnoresMemoryServerTools(t *testing.T) {
+	st, _, sessionID := openMemStore(t)
+	_ = st.AppendEvent(sessionID, "prompt", "", "2026-01-01T00:00:00.000Z")
+	// Memory-server calls must not count toward every.
+	_ = st.AppendEvent(sessionID, "tool_use", MemoryToolPrefix+"memory_save", "2026-01-01T00:00:01.000Z")
+	_ = st.AppendEvent(sessionID, "tool_use", MemoryToolPrefix+"session_summary", "2026-01-01T00:00:02.000Z")
+	if won, err := st.MarkSessionDistilled(sessionID, "2026-01-01T00:00:03.000Z", 1); err != nil || won {
+		t.Fatalf("memory-only tool calls claimed = %v, %v (must not)", won, err)
+	}
+	_ = st.AppendEvent(sessionID, "tool_use", "Edit", "2026-01-01T00:00:04.000Z")
+	if won, err := st.MarkSessionDistilled(sessionID, "2026-01-01T00:00:05.000Z", 1); err != nil || !won {
+		t.Fatalf("one real call after memory calls = %v, %v (must claim)", won, err)
 	}
 }
 
@@ -474,6 +511,19 @@ func TestMarkSessionCheckpointedRearmsAfterToolUse(t *testing.T) {
 	won, err = st.MarkSessionCheckpointed(sessionID, "2026-01-01T00:00:04.000Z", 1)
 	if err != nil || !won {
 		t.Fatalf("mark after new tool_use = %v, %v (must re-arm)", won, err)
+	}
+}
+
+func TestMarkSessionCheckpointedIgnoresMemoryServerTools(t *testing.T) {
+	st, _, sessionID := openMemStore(t)
+	_ = st.AppendEvent(sessionID, "tool_use", MemoryToolPrefix+"memory_save", "2026-01-01T00:00:00.000Z")
+	_ = st.AppendEvent(sessionID, "tool_use", MemoryToolPrefix+"memory_search", "2026-01-01T00:00:01.000Z")
+	if won, err := st.MarkSessionCheckpointed(sessionID, "2026-01-01T00:00:02.000Z", 1); err != nil || won {
+		t.Fatalf("memory-only tool calls checkpointed = %v, %v (must not)", won, err)
+	}
+	_ = st.AppendEvent(sessionID, "tool_use", "Bash", "2026-01-01T00:00:03.000Z")
+	if won, err := st.MarkSessionCheckpointed(sessionID, "2026-01-01T00:00:04.000Z", 1); err != nil || !won {
+		t.Fatalf("real call after memory calls = %v, %v (must checkpoint)", won, err)
 	}
 }
 

@@ -42,11 +42,25 @@ const checkpointReason = "Checkpoint before you lose context: save any durable c
 	"Do not call session_summary. If nothing durable is worth saving yet, save nothing. " +
 	"Then continue with your task."
 
-// checkpointToolThreshold is the number of tool_use events since the last
-// checkpoint that arms the tool-use checkpoint trigger. Conservative so mid-turn
-// interruptions stay rare. The pre-compact trigger uses threshold 1. A var, not
-// a const, so tests can lower it without driving dozens of hooks.
-var checkpointToolThreshold = 25
+// checkpointToolThreshold is the default number of real tool calls since the
+// last checkpoint that arms the tool-use checkpoint trigger; the global config
+// memory_capture.checkpoint overrides it. Conservative so mid-turn interruptions
+// stay rare. The pre-compact trigger uses threshold 1. A var, not a const, so
+// tests can lower it without driving dozens of hooks.
+var checkpointToolThreshold = config.DefaultMemoryCheckpoint
+
+// captureThresholds reads the configured end-of-reply and mid-task thresholds.
+// A config that cannot be read falls back to the defaults, so a bad file never
+// silences capture entirely (the memory gate itself still reads as inactive on
+// a load error).
+func captureThresholds(logger *diag.Logger) (every, checkpoint int) {
+	cfg, err := config.Load()
+	if err != nil {
+		logger.Log("memory", "load config: %v", err)
+		return config.DefaultMemoryEvery, checkpointToolThreshold
+	}
+	return cfg.MemoryEvery(), cfg.MemoryCheckpoint(checkpointToolThreshold)
+}
 
 // memoryHookActive evaluates the gate shared by both memory hook stages.
 // Any failure reads as inactive: the serve/capture paths must never error a
@@ -308,6 +322,10 @@ func stopDistillation(st *store.Store, logger *diag.Logger, sessionID, projectID
 	if !memoryHookActive(st, logger, projectID) {
 		return ""
 	}
+	every, _ := captureThresholds(logger)
+	if every <= 0 {
+		return ""
+	}
 	prompts, toolUses, err := st.SessionActivity(sessionID)
 	if err != nil {
 		logger.Log("memory", "session activity: %v", err)
@@ -316,7 +334,7 @@ func stopDistillation(st *store.Store, logger *diag.Logger, sessionID, projectID
 	if prompts < 1 || toolUses < 1 {
 		return ""
 	}
-	won, err := st.MarkSessionDistilled(sessionID, store.Now())
+	won, err := st.MarkSessionDistilled(sessionID, store.Now(), every)
 	if err != nil {
 		logger.Log("memory", "mark distilled: %v", err)
 		return ""
@@ -400,6 +418,11 @@ func recordCitations(st *store.Store, logger *diag.Logger, adapter assistant.Ada
 // the adapter's mid-turn envelope), or "" for silent pass-through. Any failure
 // reads as pass-through — a checkpoint must never disturb the session (FR-011).
 func checkpointCapture(st *store.Store, logger *diag.Logger, sessionID, projectID int64, threshold int) string {
+	// A threshold of 0 (configured off) never claims; without this guard the
+	// ">= 0" count would fire on every tool call.
+	if threshold <= 0 {
+		return ""
+	}
 	if !memoryHookActive(st, logger, projectID) {
 		return ""
 	}

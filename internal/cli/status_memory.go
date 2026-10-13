@@ -53,10 +53,21 @@ func printMemoryStatus(st *store.Store) {
 		}
 	}
 	fmt.Printf("Memory:           %s\n", state)
+	printMemoryCaptureStatus(cfg)
 	if found {
 		printMemoryPriorityMix(st, projectID)
 		printTeamMemoryStatus(st, cfg, projectID)
 	}
+}
+
+// printMemoryCaptureStatus adds the capture-trigger line to the memory section,
+// in the same column as the other memory lines.
+func printMemoryCaptureStatus(cfg *config.Config) {
+	every := cfg.MemoryEvery()
+	checkpoint := cfg.MemoryCheckpoint(config.DefaultMemoryCheckpoint)
+	fmt.Printf("                  capture: end-of-reply %s; checkpoint %s\n",
+		describeCaptureTrigger(every, config.DefaultMemoryEvery, "after %d tool calls"),
+		describeCaptureTrigger(checkpoint, config.DefaultMemoryCheckpoint, "every %d tool calls"))
 }
 
 // criticalShareCeiling is the share of active entries above which the critical
