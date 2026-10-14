@@ -44,6 +44,13 @@ at `/v1/cli/latest`.
 Re-running the builder replaces `dist/site`. It refuses to clear an `-out`
 folder that does not hold an earlier build.
 
+The archives' timestamps come from the commit, so a release can only be
+rebuilt byte for byte from the commit it was built from:
+
+| Version | Built from | Go |
+| --- | --- | --- |
+| 0.4.0 | `cac025b` | 1.26.9 |
+
 ## 3. Publish the site
 
 The site is served by Apache from `/var/www/agentbrain.wecansync.com`. Build
@@ -61,8 +68,14 @@ rsync -rt --chmod=D755,F644 --exclude 'releases/0.4.0' dist/site/ "$DOCROOT/"
 ```
 
 The Apache host is
-[packaging/apache/agentbrain.wecansync.com.conf](../packaging/apache/agentbrain.wecansync.com.conf);
-its header comment has the commands that enable it and add HTTPS.
+[packaging/apache/wecansync-agentbrain.conf](../packaging/apache/wecansync-agentbrain.conf);
+its header comment has the commands that enable it and add HTTPS. The
+server's certbot is a pip install without a renewal timer, so the certificate
+renews from its own cron entry, `/etc/cron.d/certbot-agentbrain`:
+
+```sh
+47 3 * * * root /usr/bin/certbot renew --cert-name agentbrain.wecansync.com --quiet
+```
 
 On nginx instead, an equivalent server block:
 
