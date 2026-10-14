@@ -115,7 +115,18 @@ func runHook(event, assistantName string) (stdout string) {
 		return ""
 	}
 	externalID := scopedExternalID(adapter.Name(), input.SessionKey)
-	sessionID, err := st.EnsureSession(externalID, projectID, at, input.TranscriptPath, adapter.Name())
+	var sessionID int64
+	var sessionHandle string
+	if st.MemoryV2 {
+		binding, bindErr := st.EnsureBoundSession(projectID, adapter.Name(), input.SessionKey, input.Cwd, input.TranscriptPath, "")
+		err = bindErr
+		sessionID = binding.SessionID
+		sessionHandle = binding.Handle
+		externalID = "v2:" + binding.Handle
+	} else {
+		sessionID, err = st.EnsureSession(externalID, projectID, at, input.TranscriptPath, adapter.Name())
+	}
+
 	if err != nil {
 		logger.Log("hook", "%s: ensure session: %v", event, err)
 		return ""
@@ -137,6 +148,10 @@ func runHook(event, assistantName string) (stdout string) {
 		// The link offer rides the same injection; it must go out even when the
 		// pack is empty (a brand-new project has no memories yet).
 		text := pack.Text
+		if sessionHandle != "" && memoryHookActive(st, logger, projectID) {
+			text += v2RecoveryNote(st, projectID)
+			text += "\nLocal memory attribution: pass session_handle " + sessionHandle + " with MCP memory calls. This handle identifies this conversation, not authority.\n"
+		}
 		if offer := linkOfferNote(logger, input.Cwd); offer != "" {
 			if text != "" {
 				text += "\n"
@@ -165,7 +180,13 @@ func runHook(event, assistantName string) (stdout string) {
 			stdout = pr.PromptResponse()
 		}
 	case assistant.EventToolUse:
-		appendEvent(st, logger, sessionID, "tool_use", input.ToolName, at)
+		if input.FromSubagent {
+			appendEvent(st, logger, sessionID, "subagent_tool_use", input.ToolName, at)
+			break
+		}
+		if !strings.Contains(input.ToolName, "memory_") && !strings.Contains(input.ToolName, "session_summary") {
+			appendEvent(st, logger, sessionID, "tool_use", input.ToolName, at)
+		}
 		// Only claim a checkpoint for an adapter that can actually push the
 		// prompt back to the model mid-turn; otherwise the claim would advance
 		// memory_checkpointed_at and burn the re-arm baseline with nothing

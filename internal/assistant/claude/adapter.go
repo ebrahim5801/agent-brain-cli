@@ -70,6 +70,9 @@ func (Adapter) ParseHook(event string, r io.Reader) (assistant.HookInput, error)
 		Cwd:            p.Cwd,
 		TranscriptPath: p.TranscriptPath,
 		ToolName:       p.ToolName,
+		// SubagentStop always carries the finished subagent's agent_id but
+		// fires in the parent conversation, so it is not "from" the subagent.
+		FromSubagent: p.AgentID != "" && event != assistant.EventSubagentStop,
 	}, nil
 }
 
@@ -177,11 +180,10 @@ func (Adapter) StopResponse(reason string) string {
 	return blockDecision(reason)
 }
 
-// MidTurnResponse wraps the checkpoint prompt in Claude Code's blocking
-// decision envelope, used on PostToolUse and PreCompact to make the model save
-// interim memory before continuing (assistant.MidTurnResponder).
+// MidTurnResponse carries informational PostToolUse context without rejecting
+// or hiding the host tool result (assistant.MidTurnResponder).
 func (Adapter) MidTurnResponse(reason string) string {
-	return blockDecision(reason)
+	return injectionEnvelope("PostToolUse", reason, "")
 }
 
 func blockDecision(reason string) string {

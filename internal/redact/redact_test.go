@@ -16,6 +16,8 @@ func TestApply(t *testing.T) {
 		in   string
 		want string
 	}{
+		{"short URL password", "postgres://user:abc@localhost/db", "postgres://user:[redacted:url-credential]@localhost/db"},
+		{"JSON credential", `{"api_key": "synthetic-secret-123"}`, `{"api_key": "[redacted:credential]"}`},
 		{"aws key", "the key is AKIAIOSFODNN7EXAMPLE ok", "the key is [redacted:aws-key] ok"},
 		{"github token", "use ghp_abcdefghij1234567890KLMNOP here", "use [redacted:github-token] here"},
 		{"gitlab token", "glpat-AbCdEf123456789012345 works", "[redacted:gitlab-token] works"},

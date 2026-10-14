@@ -28,7 +28,7 @@ const (
 )
 
 // HookInput is the complete neutral vocabulary a hook payload may contribute.
-// These six fields are the whitelist: prompt text, tool inputs/outputs, file
+// These fields are the whitelist: prompt text, tool inputs/outputs, file
 // contents, and model message bodies are unrepresentable past ParseHook.
 type HookInput struct {
 	SessionKey     string       // native session/conversation id; required
@@ -38,6 +38,12 @@ type HookInput struct {
 	Model          string       // when the payload states it
 	Usage          *store.Usage // model-usage events only; nil elsewhere
 	Subagent       *SubagentRef // subagent-stop events only; nil elsewhere
+	// FromSubagent is true when the payload says the event fired inside a
+	// subagent run rather than in the session's own conversation (Claude
+	// Code's agent_id). Such a tool call is the subagent's work: it must not
+	// count toward the parent's capture thresholds, and a checkpoint emitted
+	// on it would land in the subagent, not in the conversation it protects.
+	FromSubagent bool
 }
 
 // SubagentRef identifies the child run a subagent-stop payload names, for

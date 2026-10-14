@@ -29,3 +29,20 @@ never touched by account or org deletion (FR-024).
 | `memory_team_supersedes` | Local supersede-link cache | Disposable cache; rebuilt on sync | user | consent |
 | `team_sync_state` | Local team-memory sync cursor/endpoint | Retained locally to drive incremental sync | user | contract |
 | `diagnostics` | Local diagnostic counters | Retained locally until the user clears it | user | legitimate-interest |
+
+## Memory V2 additive local data
+
+V2 metadata preserves historical memories; lifecycle transitions append events. No automatic deletion or historical backfill occurs. Explicit user wipe/delete controls remain available.
+
+| Table | Contents | Retention rule | Owner | Legal basis |
+| --- | --- | --- | --- | --- |
+| `memory_share_consents` | Per-member memory-sharing consent records | Retained while sharing; deleted on consent revoke or account deletion | member | consent |
+| `memory_usage_events` | Local retrieval/citation counters per session and memory entry | Retained locally until the user clears it; syncs identifiers/counts only, never memory content | user | legitimate-interest |
+| `memory_team_supersedes` | Local supersede-link cache | Disposable cache; rebuilt on sync | user | consent |
+| `memory_session_bindings` | Local session binding, capture, evidence, receipt or lifecycle metadata | Retain until explicit user data removal; preserve recovery/history/receipts | local user | memory consent |
+| `memory_capture_batches` | Local session binding, capture, evidence, receipt or lifecycle metadata | Retain until explicit user data removal; preserve recovery/history/receipts | local user | memory consent |
+| `memory_write_receipts` | Local session binding, capture, evidence, receipt or lifecycle metadata | Retain until explicit user data removal; preserve recovery/history/receipts | local user | memory consent |
+| `memory_details` | Local session binding, capture, evidence, receipt or lifecycle metadata | Retain until explicit user data removal; preserve recovery/history/receipts | local user | memory consent |
+| `memory_evidence` | Local session binding, capture, evidence, receipt or lifecycle metadata | Retain until explicit user data removal; preserve recovery/history/receipts | local user | memory consent |
+| `memory_relations` | Local session binding, capture, evidence, receipt or lifecycle metadata | Retain until explicit user data removal; preserve recovery/history/receipts | local user | memory consent |
+| `memory_state_events` | Local session binding, capture, evidence, receipt or lifecycle metadata | Retain until explicit user data removal; preserve recovery/history/receipts | local user | memory consent |

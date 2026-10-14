@@ -82,7 +82,7 @@ func TestSaveRejectsInvalidInput(t *testing.T) {
 	}
 }
 
-func TestSaveSupersedes(t *testing.T) {
+func TestLegacySaveDefersSupersessionWithoutRewritingHistory(t *testing.T) {
 	st, projectID := openStore(t)
 	dir := t.TempDir()
 
@@ -103,14 +103,14 @@ func TestSaveSupersedes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Superseded) != 1 || res.Superseded[0] != first.ID {
+	if len(res.Superseded) != 0 || len(res.Pending) != 1 || res.Pending[0] != first.ID {
 		t.Errorf("superseded = %v", res.Superseded)
 	}
 	if len(res.Rejected) != 2 {
 		t.Errorf("rejected = %v", res.Rejected)
 	}
 	old, _ := st.GetMemory(first.ID)
-	if old.Status != store.MemorySuperseded || old.SupersededBy.Int64 != res.ID {
+	if old.Status != store.MemoryActive || old.SupersededBy.Valid {
 		t.Errorf("old entry = %+v", old)
 	}
 	untouched, _ := st.GetMemory(foreign.ID)

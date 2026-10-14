@@ -251,3 +251,8 @@ func (Adapter) StopResponse(reason string) string {
 	}
 	return string(out)
 }
+
+// MidTurnResponse uses informational context; it never rejects a code-mode tool promise.
+func (Adapter) MidTurnResponse(reason string) string {
+	return injectionEnvelope("PostToolUse", reason, "")
+}

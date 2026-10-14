@@ -57,8 +57,9 @@ release:
 
 # The tap/bucket repositories do not exist yet; manifests are generated but
 # not pushed. Flip skip_upload to false once the repos are created.
-brews:
-  - repository:
+homebrew_casks:
+  - binaries: [agent-brain]
+    repository:
       owner: ebrahim5801
       name: homebrew-tap
     skip_upload: true

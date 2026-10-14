@@ -204,8 +204,8 @@ func TestAdapterImplementsExpectedOptionalInterfaces(t *testing.T) {
 	}
 	// Deferred until probed: blocking on Codex's PostToolUse replaces the tool
 	// result rather than prompting the model, which could corrupt it.
-	if _, ok := a.(assistant.MidTurnResponder); ok {
-		t.Error("MidTurnResponder must stay unimplemented until PostToolUse block semantics are verified")
+	if _, ok := a.(assistant.MidTurnResponder); !ok {
+		t.Error("MidTurnResponder must inject informational PostToolUse context")
 	}
 	if _, ok := a.(assistant.UsageBackfiller); !ok {
 		t.Error("want UsageBackfiller: usage is backfilled from the rollout JSONL")

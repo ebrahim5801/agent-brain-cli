@@ -17,6 +17,7 @@ const maxPayloadBytes = 10 << 20
 // beyond session id, cwd, model, and usage is representable here: prompt
 // text, tool bodies, and message content never enter this struct.
 type payload struct {
+	ToolName  string `json:"tool_name"`
 	SessionID string `json:"session_id"`
 	Cwd       string `json:"cwd"`
 	Model     string `json:"model"`
@@ -73,6 +74,7 @@ func (Adapter) ParseHook(event string, r io.Reader) (assistant.HookInput, error)
 		return assistant.HookInput{}, err
 	}
 	out := assistant.HookInput{
+		ToolName:   p.ToolName,
 		SessionKey: p.SessionID,
 		Cwd:        p.Cwd,
 	}
@@ -96,7 +98,16 @@ func (Adapter) ParseHook(event string, r io.Reader) (assistant.HookInput, error)
 // InjectionResponse is unimplemented: not exercised live in the spike (see
 // plans/spikes/opencode.md §5). Returning "" honestly skips the stage rather
 // than guessing at an envelope.
-func (Adapter) InjectionResponse(pack string) string { return "" }
+func (Adapter) InjectionResponse(pack string) string {
+	raw, _ := json.Marshal(map[string]string{"additionalContext": pack})
+	return string(raw)
+}
 
 // StopResponse is unimplemented for the same reason as InjectionResponse.
-func (Adapter) StopResponse(reason string) string { return "" }
+func (Adapter) StopResponse(reason string) string {
+	raw, _ := json.Marshal(map[string]string{"reason": reason})
+	return string(raw)
+}
+
+func (a Adapter) PromptInjectionResponse(pack string) string { return a.InjectionResponse(pack) }
+func (a Adapter) MidTurnResponse(reason string) string       { return a.InjectionResponse(reason) }

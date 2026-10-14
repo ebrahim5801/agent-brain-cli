@@ -1,0 +1,218 @@
+[
+  {
+    "Subject": "invoice-queue",
+    "Before": "Use SlateQueue for invoice-queue",
+    "After": "Use GraniteQueue for invoice-queue",
+    "Conflict": true
+  },
+  {
+    "Subject": "invoice-queue",
+    "Before": "Use SlateQueue for invoice-queue",
+    "After": "Keep SlateQueue for invoice-queue because the established contract is stable",
+    "Conflict": false
+  },
+  {
+    "Subject": "invoice-queue",
+    "Before": "Use SlateQueue for invoice-queue",
+    "After": "Use GraniteQueue for invoice-queue",
+    "ScopeBefore": "branch:alpha",
+    "ScopeAfter": "branch:beta",
+    "Conflict": false
+  },
+  {
+    "Subject": "invoice-queue",
+    "Before": "Use SlateQueue for invoice-queue",
+    "After": "Use GraniteQueue for another workload",
+    "SubjectAfter": "invoice-queue-other",
+    "Conflict": false
+  },
+  {
+    "Subject": "local-database",
+    "Before": "Use SQLite for local-database",
+    "After": "Use PostgreSQL for local-database",
+    "Conflict": true
+  },
+  {
+    "Subject": "local-database",
+    "Before": "Use SQLite for local-database",
+    "After": "Keep SQLite for local-database because the established contract is stable",
+    "Conflict": false
+  },
+  {
+    "Subject": "local-database",
+    "Before": "Use SQLite for local-database",
+    "After": "Use PostgreSQL for local-database",
+    "ScopeBefore": "branch:alpha",
+    "ScopeAfter": "branch:beta",
+    "Conflict": false
+  },
+  {
+    "Subject": "local-database",
+    "Before": "Use SQLite for local-database",
+    "After": "Use PostgreSQL for another workload",
+    "SubjectAfter": "local-database-other",
+    "Conflict": false
+  },
+  {
+    "Subject": "http-client",
+    "Before": "Use FetchClient for http-client",
+    "After": "Use RequestClient for http-client",
+    "Conflict": true
+  },
+  {
+    "Subject": "http-client",
+    "Before": "Use FetchClient for http-client",
+    "After": "Keep FetchClient for http-client because the established contract is stable",
+    "Conflict": false
+  },
+  {
+    "Subject": "http-client",
+    "Before": "Use FetchClient for http-client",
+    "After": "Use RequestClient for http-client",
+    "ScopeBefore": "branch:alpha",
+    "ScopeAfter": "branch:beta",
+    "Conflict": false
+  },
+  {
+    "Subject": "http-client",
+    "Before": "Use FetchClient for http-client",
+    "After": "Use RequestClient for another workload",
+    "SubjectAfter": "http-client-other",
+    "Conflict": false
+  },
+  {
+    "Subject": "cache-backend",
+    "Before": "Use Redis for cache-backend",
+    "After": "Use Memcached for cache-backend",
+    "Conflict": true
+  },
+  {
+    "Subject": "cache-backend",
+    "Before": "Use Redis for cache-backend",
+    "After": "Keep Redis for cache-backend because the established contract is stable",
+    "Conflict": false
+  },
+  {
+    "Subject": "cache-backend",
+    "Before": "Use Redis for cache-backend",
+    "After": "Use Memcached for cache-backend",
+    "ScopeBefore": "branch:alpha",
+    "ScopeAfter": "branch:beta",
+    "Conflict": false
+  },
+  {
+    "Subject": "cache-backend",
+    "Before": "Use Redis for cache-backend",
+    "After": "Use Memcached for another workload",
+    "SubjectAfter": "cache-backend-other",
+    "Conflict": false
+  },
+  {
+    "Subject": "ci-runner",
+    "Before": "Use RunnerAlpha for ci-runner",
+    "After": "Use RunnerBeta for ci-runner",
+    "Conflict": true
+  },
+  {
+    "Subject": "ci-runner",
+    "Before": "Use RunnerAlpha for ci-runner",
+    "After": "Keep RunnerAlpha for ci-runner because the established contract is stable",
+    "Conflict": false
+  },
+  {
+    "Subject": "ci-runner",
+    "Before": "Use RunnerAlpha for ci-runner",
+    "After": "Use RunnerBeta for ci-runner",
+    "ScopeBefore": "branch:alpha",
+    "ScopeAfter": "branch:beta",
+    "Conflict": false
+  },
+  {
+    "Subject": "ci-runner",
+    "Before": "Use RunnerAlpha for ci-runner",
+    "After": "Use RunnerBeta for another workload",
+    "SubjectAfter": "ci-runner-other",
+    "Conflict": false
+  },
+  {
+    "Subject": "date-library",
+    "Before": "Use DateUtil for date-library",
+    "After": "Use TimeUtil for date-library",
+    "Conflict": true
+  },
+  {
+    "Subject": "date-library",
+    "Before": "Use DateUtil for date-library",
+    "After": "Keep DateUtil for date-library because the established contract is stable",
+    "Conflict": false
+  },
+  {
+    "Subject": "date-library",
+    "Before": "Use DateUtil for date-library",
+    "After": "Use TimeUtil for date-library",
+    "ScopeBefore": "branch:alpha",
+    "ScopeAfter": "branch:beta",
+    "Conflict": false
+  },
+  {
+    "Subject": "date-library",
+    "Before": "Use DateUtil for date-library",
+    "After": "Use TimeUtil for another workload",
+    "SubjectAfter": "date-library-other",
+    "Conflict": false
+  },
+  {
+    "Subject": "test-framework",
+    "Before": "Use TestAlpha for test-framework",
+    "After": "Use TestBeta for test-framework",
+    "Conflict": true
+  },
+  {
+    "Subject": "test-framework",
+    "Before": "Use TestAlpha for test-framework",
+    "After": "Keep TestAlpha for test-framework because the established contract is stable",
+    "Conflict": false
+  },
+  {
+    "Subject": "test-framework",
+    "Before": "Use TestAlpha for test-framework",
+    "After": "Use TestBeta for test-framework",
+    "ScopeBefore": "branch:alpha",
+    "ScopeAfter": "branch:beta",
+    "Conflict": false
+  },
+  {
+    "Subject": "test-framework",
+    "Before": "Use TestAlpha for test-framework",
+    "After": "Use TestBeta for another workload",
+    "SubjectAfter": "test-framework-other",
+    "Conflict": false
+  },
+  {
+    "Subject": "backup-format",
+    "Before": "Use FormatAlpha for backup-format",
+    "After": "Use FormatBeta for backup-format",
+    "Conflict": true
+  },
+  {
+    "Subject": "backup-format",
+    "Before": "Use FormatAlpha for backup-format",
+    "After": "Keep FormatAlpha for backup-format because the established contract is stable",
+    "Conflict": false
+  },
+  {
+    "Subject": "backup-format",
+    "Before": "Use FormatAlpha for backup-format",
+    "After": "Use FormatBeta for backup-format",
+    "ScopeBefore": "branch:alpha",
+    "ScopeAfter": "branch:beta",
+    "Conflict": false
+  },
+  {
+    "Subject": "backup-format",
+    "Before": "Use FormatAlpha for backup-format",
+    "After": "Use FormatBeta for another workload",
+    "SubjectAfter": "backup-format-other",
+    "Conflict": false
+  }
+]

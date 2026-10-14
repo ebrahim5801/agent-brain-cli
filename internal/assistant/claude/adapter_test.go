@@ -2,7 +2,10 @@ package claude
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
+
+	"github.com/ebrahim5801/agent-brain-cli/internal/assistant"
 )
 
 func TestInjectionResponseEnvelope(t *testing.T) {
@@ -48,5 +51,27 @@ func TestInjectionResponseWithNotice(t *testing.T) {
 
 	if plain, withEmpty := (Adapter{}).InjectionResponse("p"), (Adapter{}).InjectionResponseWithNotice("p", ""); plain != withEmpty {
 		t.Errorf("empty notice should match plain response: %q vs %q", plain, withEmpty)
+	}
+}
+
+func TestParseHookFromSubagent(t *testing.T) {
+	for _, tc := range []struct {
+		name, event, payload string
+		want                 bool
+	}{
+		{"main conversation", assistant.EventToolUse, `{"session_id":"s","tool_name":"Edit"}`, false},
+		{"inside a subagent", assistant.EventToolUse, `{"session_id":"s","tool_name":"Edit","agent_id":"a1"}`, true},
+		{"empty agent_id", assistant.EventToolUse, `{"session_id":"s","tool_name":"Edit","agent_id":""}`, false},
+		{"subagent-stop names the child", assistant.EventSubagentStop, `{"session_id":"s","agent_id":"a1"}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in, err := Adapter{}.ParseHook(tc.event, strings.NewReader(tc.payload))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if in.FromSubagent != tc.want {
+				t.Errorf("FromSubagent = %v, want %v", in.FromSubagent, tc.want)
+			}
+		})
 	}
 }

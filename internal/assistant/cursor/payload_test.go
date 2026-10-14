@@ -8,6 +8,7 @@ import (
 func TestParseHookMapsWhitelistedFields(t *testing.T) {
 	body := `{
 		"conversation_id": "conv-123",
+ "cwd": "/home/user/project",
 		"workspace_roots": ["/home/user/project", "/other"],
 		"transcript_path": "/tmp/transcript.jsonl",
 		"model": "gpt-5",
@@ -80,5 +81,11 @@ func TestStopResponseEnvelope(t *testing.T) {
 	want := `{"followup_message":"please distill"}`
 	if got != want {
 		t.Errorf("StopResponse = %s, want %s", got, want)
+	}
+}
+
+func TestMultipleRootsWithoutCwdRejectAmbiguousAttribution(t *testing.T) {
+	if _, err := (Adapter{}).ParseHook("prompt", strings.NewReader(`{"conversation_id":"ambiguous","workspace_roots":["/a","/b"]}`)); err == nil {
+		t.Fatal("ambiguous roots attributed to first project")
 	}
 }

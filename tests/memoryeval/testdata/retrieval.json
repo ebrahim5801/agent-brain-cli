@@ -1,0 +1,482 @@
+[
+  {
+    "family": "invoice",
+    "split": "development",
+    "target": "Use QuartzQueue for invoice workers because durable retries survive worker restarts.",
+    "queries": [
+      "invoice workers retries",
+      "invoice worker durable",
+      "QuartzQueue",
+      "invoice restarts",
+      "invoice queue"
+    ],
+    "distractors": [
+      "invoice meeting notes: discuss invoice on Friday.",
+      "Critical unrelated deployment: invoice dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "authentication",
+    "split": "development",
+    "target": "Use short lived authentication tokens because sessions must expire after logout.",
+    "queries": [
+      "authentication tokens logout",
+      "authentication expire",
+      "tokens sessions",
+      "logout sessions",
+      "short lived tokens"
+    ],
+    "distractors": [
+      "authentication meeting notes: discuss authentication on Friday.",
+      "Critical unrelated deployment: authentication dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "postgres",
+    "split": "development",
+    "target": "Use PostgreSQL transaction locks because concurrent migrations must serialize across processes.",
+    "queries": [
+      "postgres migrations locks",
+      "transaction migrations",
+      "concurrent serialize",
+      "PostgreSQL locks",
+      "migrations processes"
+    ],
+    "distractors": [
+      "postgres meeting notes: discuss postgres on Friday.",
+      "Critical unrelated deployment: postgres dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "sqlite",
+    "split": "development",
+    "target": "Use SQLite WAL with FULL synchronization because acknowledged memory writes must survive power loss.",
+    "queries": [
+      "sqlite memory writes",
+      "SQLite WAL",
+      "acknowledged writes",
+      "power loss",
+      "FULL synchronization"
+    ],
+    "distractors": [
+      "sqlite meeting notes: discuss sqlite on Friday.",
+      "Critical unrelated deployment: sqlite dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "privacy",
+    "split": "development",
+    "target": "Redact credentials before truncating summaries because partial secrets evade recognizable patterns.",
+    "queries": [
+      "redact credentials summaries",
+      "partial secrets",
+      "truncate summaries",
+      "credentials patterns",
+      "redaction truncation"
+    ],
+    "distractors": [
+      "privacy meeting notes: discuss redact on Friday.",
+      "Critical unrelated deployment: privacy dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "sessions",
+    "split": "development",
+    "target": "Bind each session by assistant and project identity because concurrent conversations must never share attribution.",
+    "queries": [
+      "sessions project attribution",
+      "concurrent conversations",
+      "assistant identity",
+      "session binding",
+      "conversations attribution"
+    ],
+    "distractors": [
+      "sessions meeting notes: discuss sessions on Friday.",
+      "Critical unrelated deployment: sessions dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "history",
+    "split": "development",
+    "target": "Preserve decision history using append only relationships because original historical memory rows must remain unchanged.",
+    "queries": [
+      "decision history relationships",
+      "historical rows",
+      "append only",
+      "original unchanged",
+      "memory history"
+    ],
+    "distractors": [
+      "history meeting notes: discuss decision on Friday.",
+      "Critical unrelated deployment: history dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "rollback",
+    "split": "development",
+    "target": "Retain effective lifecycle readers during rollback because old binaries cannot understand supersession overlays.",
+    "queries": [
+      "rollback lifecycle readers",
+      "old binaries",
+      "supersession overlays",
+      "rollback effective",
+      "readers overlays"
+    ],
+    "distractors": [
+      "rollback meeting notes: discuss rollback on Friday.",
+      "Critical unrelated deployment: rollback dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "consent",
+    "split": "development",
+    "target": "Pause memory capture when consent is withdrawn because new sensitive content requires authorization.",
+    "queries": [
+      "memory consent capture",
+      "consent withdrawn",
+      "sensitive authorization",
+      "pause capture",
+      "withdrawn content"
+    ],
+    "distractors": [
+      "consent meeting notes: discuss memory on Friday.",
+      "Critical unrelated deployment: consent dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "billing",
+    "split": "development",
+    "target": "Keep personal memory gated by verified Pro entitlement because subscription state belongs to the server.",
+    "queries": [
+      "personal entitlement server",
+      "Pro subscription",
+      "verified entitlement",
+      "billing memory",
+      "subscription state"
+    ],
+    "distractors": [
+      "billing meeting notes: discuss personal on Friday.",
+      "Critical unrelated deployment: billing dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "csv",
+    "split": "development",
+    "target": "Escape CSV cells starting with formula symbols because spreadsheet applications execute untrusted values.",
+    "queries": [
+      "CSV formula cells",
+      "spreadsheet applications",
+      "untrusted values",
+      "escape symbols",
+      "CSV cells"
+    ],
+    "distractors": [
+      "csv meeting notes: discuss CSV on Friday.",
+      "Critical unrelated deployment: csv dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "cache",
+    "split": "development",
+    "target": "Invalidate the build cache by source digest because timestamps alone miss content changes.",
+    "queries": [
+      "build cache digest",
+      "source changes",
+      "timestamps content",
+      "invalidate cache",
+      "cache source"
+    ],
+    "distractors": [
+      "cache meeting notes: discuss build on Friday.",
+      "Critical unrelated deployment: cache dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "timeout",
+    "split": "development",
+    "target": "Bound Git subprocess time per retrieval because slow repositories must not block assistant startup.",
+    "queries": [
+      "Git retrieval time",
+      "slow repositories",
+      "assistant startup",
+      "subprocess timeout",
+      "bound time"
+    ],
+    "distractors": [
+      "timeout meeting notes: discuss Git on Friday.",
+      "Critical unrelated deployment: timeout dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "locale",
+    "split": "development",
+    "target": "Count Unicode code points for memory limits because Arabic text must not be limited by UTF8 bytes.",
+    "queries": [
+      "Unicode memory limits",
+      "Arabic bytes",
+      "code points",
+      "UTF8 text",
+      "Arabic memory"
+    ],
+    "distractors": [
+      "locale meeting notes: discuss Unicode on Friday.",
+      "Critical unrelated deployment: locale dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "dedup",
+    "split": "development",
+    "target": "Use durable operation identifiers for retry deduplication because a lost response does not imply a failed transaction.",
+    "queries": [
+      "operation retry transaction",
+      "lost response",
+      "durable identifiers",
+      "retry deduplication",
+      "failed transaction"
+    ],
+    "distractors": [
+      "dedup meeting notes: discuss operation on Friday.",
+      "Critical unrelated deployment: dedup dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "scope",
+    "split": "development",
+    "target": "Keep branch decisions scoped to their checkout because parallel feature branches may require different choices.",
+    "queries": [
+      "branch decisions checkout",
+      "parallel feature branches",
+      "different choices",
+      "scoped decisions",
+      "branch checkout"
+    ],
+    "distractors": [
+      "scope meeting notes: discuss branch on Friday.",
+      "Critical unrelated deployment: scope dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "source",
+    "split": "development",
+    "target": "Verify a decision source against the original user message because assistant assertions are not user authorization.",
+    "queries": [
+      "decision original user",
+      "assistant assertions",
+      "source message",
+      "user authorization",
+      "verify decision"
+    ],
+    "distractors": [
+      "source meeting notes: discuss decision on Friday.",
+      "Critical unrelated deployment: source dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "export",
+    "split": "development",
+    "target": "Include evidence and relationship tables in export because row counts alone cannot detect missing history.",
+    "queries": [
+      "export evidence tables",
+      "relationship history",
+      "row counts",
+      "missing history",
+      "include evidence"
+    ],
+    "distractors": [
+      "export meeting notes: discuss export on Friday.",
+      "Critical unrelated deployment: export dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "network",
+    "split": "development",
+    "target": "Keep capture packages offline because telemetry and memory use separate consent boundaries.",
+    "queries": [
+      "capture packages offline",
+      "telemetry memory consent",
+      "network boundaries",
+      "separate consent",
+      "offline capture"
+    ],
+    "distractors": [
+      "network meeting notes: discuss capture on Friday.",
+      "Critical unrelated deployment: network dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "recovery",
+    "split": "development",
+    "target": "Resume only unsaved capture items after interruption because persisted receipts identify already acknowledged writes.",
+    "queries": [
+      "resume capture interruption",
+      "persisted receipts",
+      "acknowledged writes",
+      "unsaved items",
+      "recovery capture"
+    ],
+    "distractors": [
+      "recovery meeting notes: discuss resume on Friday.",
+      "Critical unrelated deployment: recovery dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "manifest",
+    "split": "heldout",
+    "target": "Require all declared capture items before completion because partial persistence must remain pending.",
+    "queries": [
+      "declared capture completion",
+      "partial persistence",
+      "pending items",
+      "manifest capture",
+      "completion pending"
+    ],
+    "distractors": [
+      "manifest meeting notes: discuss declared on Friday.",
+      "Critical unrelated deployment: manifest dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "verification",
+    "split": "heldout",
+    "target": "Keep Git matching separate from verification because an unchanged commit does not prove semantic correctness.",
+    "queries": [
+      "Git verification commit",
+      "semantic correctness",
+      "matching separate",
+      "unchanged commit",
+      "verification correctness"
+    ],
+    "distractors": [
+      "verification meeting notes: discuss Git on Friday.",
+      "Critical unrelated deployment: verification dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "injection",
+    "split": "heldout",
+    "target": "Render stored memories as escaped data because embedded instructions must never override the current user.",
+    "queries": [
+      "stored memories escaped",
+      "embedded instructions",
+      "current user",
+      "injection data",
+      "render memories"
+    ],
+    "distractors": [
+      "injection meeting notes: discuss stored on Friday.",
+      "Critical unrelated deployment: injection dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "leases",
+    "split": "heldout",
+    "target": "Use lease generations when recovering capture because expired workers must not complete a newer claim.",
+    "queries": [
+      "lease generations capture",
+      "expired workers",
+      "newer claim",
+      "recovering capture",
+      "lease complete"
+    ],
+    "distractors": [
+      "leases meeting notes: discuss lease on Friday.",
+      "Critical unrelated deployment: leases dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "clocks",
+    "split": "heldout",
+    "target": "Use event sequence numbers for checkpoints because millisecond timestamps can collide or move backwards.",
+    "queries": [
+      "event sequence checkpoints",
+      "millisecond timestamps",
+      "clocks backwards",
+      "sequence numbers",
+      "checkpoint timestamps"
+    ],
+    "distractors": [
+      "clocks meeting notes: discuss event on Friday.",
+      "Critical unrelated deployment: clocks dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "symbols",
+    "split": "heldout",
+    "target": "Keep exact symbol matches alongside normalized prose because stemming can damage code identifiers.",
+    "queries": [
+      "symbol normalized prose",
+      "stemming identifiers",
+      "exact matches",
+      "code identifiers",
+      "symbols matches"
+    ],
+    "distractors": [
+      "symbols meeting notes: discuss symbol on Friday.",
+      "Critical unrelated deployment: symbols dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "conflict",
+    "split": "heldout",
+    "target": "Surface both unresolved decision heads because newest timestamps cannot resolve contradictory evidence.",
+    "queries": [
+      "unresolved decision heads",
+      "contradictory evidence",
+      "newest timestamps",
+      "conflict decision",
+      "resolve evidence"
+    ],
+    "distractors": [
+      "conflict meeting notes: discuss unresolved on Friday.",
+      "Critical unrelated deployment: conflict dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "task",
+    "split": "heldout",
+    "target": "Complete a task only against its acceptance criteria because unrelated passing tests cannot prove its outcome.",
+    "queries": [
+      "task acceptance criteria",
+      "passing tests",
+      "unrelated outcome",
+      "complete task",
+      "criteria tests"
+    ],
+    "distractors": [
+      "task meeting notes: discuss task on Friday.",
+      "Critical unrelated deployment: task dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "retention",
+    "split": "heldout",
+    "target": "Retain pending recovery operations because expiration must not silently lose acknowledged memory.",
+    "queries": [
+      "pending recovery operations",
+      "expiration acknowledged",
+      "silently memory",
+      "retain operations",
+      "retention recovery"
+    ],
+    "distractors": [
+      "retention meeting notes: discuss pending on Friday.",
+      "Critical unrelated deployment: retention dashboard styling review is waiting for a color choice."
+    ]
+  },
+  {
+    "family": "sharing",
+    "split": "heldout",
+    "target": "Keep local evidence out of team wire messages because automatic local verification must not expand sharing consent.",
+    "queries": [
+      "local evidence team",
+      "wire sharing consent",
+      "automatic verification",
+      "team messages",
+      "sharing evidence"
+    ],
+    "distractors": [
+      "sharing meeting notes: discuss local on Friday.",
+      "Critical unrelated deployment: sharing dashboard styling review is waiting for a color choice."
+    ]
+  }
+]

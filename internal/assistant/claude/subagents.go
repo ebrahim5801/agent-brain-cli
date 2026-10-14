@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/ebrahim5801/agent-brain-cli/internal/redact"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
 	"github.com/ebrahim5801/agent-brain-cli/wire"
 )
@@ -85,7 +86,7 @@ func ScanSubagents(mainTranscriptPath string) []Subagent {
 		if raw, err := readCapped(strings.TrimSuffix(path, ".jsonl")+".meta.json", maxMetaBytes); err == nil {
 			if json.Unmarshal(raw, &meta) == nil {
 				sa.AgentType = wire.SanitizeAgentType(meta.AgentType)
-				sa.Description = truncateBytes(meta.Description, maxReportBytes)
+				sa.Description = truncateBytes(redact.Apply(meta.Description), maxReportBytes)
 			}
 		}
 		out = append(out, sa)
@@ -173,8 +174,10 @@ func parseAgentTranscript(path string) (Subagent, bool) {
 		modelTokens[al.Message.Model] += u.InputTokens + u.OutputTokens
 	}
 	sa.Model = dominantModel(modelTokens)
-	sa.FinalReport = truncateBytes(sa.FinalReport, maxReportBytes)
-	sa.Prompt = truncateBytes(sa.Prompt, maxReportBytes)
+	// Redact before truncation: cutting through a token first can hide its
+	// recognized shape while leaving a sensitive prefix in the stored excerpt.
+	sa.FinalReport = truncateBytes(redact.Apply(sa.FinalReport), maxReportBytes)
+	sa.Prompt = truncateBytes(redact.Apply(sa.Prompt), maxReportBytes)
 	return sa, any
 }
 

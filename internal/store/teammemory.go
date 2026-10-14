@@ -11,6 +11,8 @@ import (
 // more than one cached entry — the caller must present a longer handle.
 var ErrAmbiguousTeamHandle = errors.New("team handle matches more than one entry")
 
+var ErrTeamMemoryProjectMismatch = errors.New("team memory uid belongs to another project")
+
 // TeamMemoryRow mirrors a server pool entry in the local read-through cache.
 // The cache is disposable: dropping it loses nothing (a full pull from cursor
 // ” rebuilds it from cloud truth).
@@ -60,12 +62,12 @@ func (s *Store) ApplyPull(projectID int64, rows []TeamMemoryRow) error {
 	defer tx.Rollback()
 	for _, r := range rows {
 		if r.Status == "deleted" {
-			if _, err := tx.Exec(s.Rebind(`DELETE FROM team_memories WHERE uid = ?`), r.UID); err != nil {
+			if _, err := tx.Exec(s.Rebind(`DELETE FROM team_memories WHERE uid = ? AND project_id = ?`), r.UID, projectID); err != nil {
 				return err
 			}
 			continue
 		}
-		if _, err := s.ExecTx(tx, `
+		res, err := s.ExecTx(tx, `
             INSERT INTO team_memories
                 (uid, project_id, author, author_former, content, kind, origin, priority, status,
                  contradicts, flagged, mine, branch, commit_hash, captured_at, updated_at)
@@ -84,27 +86,38 @@ func (s *Store) ApplyPull(projectID int64, rows []TeamMemoryRow) error {
                 branch = excluded.branch,
                 commit_hash = excluded.commit_hash,
                 captured_at = excluded.captured_at,
-                updated_at = excluded.updated_at`,
+				updated_at = excluded.updated_at
+            WHERE team_memories.project_id = excluded.project_id`,
 			r.UID, projectID, r.Author, r.AuthorFormer, r.Content, r.Kind, r.Origin, priorityOrDefault(r.Priority), r.Status,
 			nullIfEmpty(r.Contradicts), r.Flagged, r.Mine, nullIfEmpty(r.Branch), nullIfEmpty(r.CommitHash),
-			r.CapturedAt, r.UpdatedAt); err != nil {
+			r.CapturedAt, r.UpdatedAt)
+		if err != nil {
 			return err
+		}
+		if n, err := res.RowsAffected(); err != nil {
+			return err
+		} else if n == 0 {
+			return ErrTeamMemoryProjectMismatch
 		}
 	}
 	return tx.Commit()
 }
 
 // ListTeamMemories returns the project's active cached entries newest-first,
-// for serving alongside personal memory. The reader's own contributions are
-// excluded — they are already served from the personal memories table, and
-// serving both would duplicate every line a sharing author writes.
+// for serving alongside personal memory. An own contribution is excluded only
+// when it exists locally: own entries from another device still need serving.
+// Include inactive local rows in the exclusion so a local delete or supersede
+// cannot be undone by a cached team copy awaiting synchronization.
 func (s *Store) ListTeamMemories(projectID int64) ([]TeamMemoryRow, error) {
 	rows, err := s.Query(`
         SELECT uid, project_id, author, author_former, content, kind, origin, priority, status,
                COALESCE(contradicts, ''), flagged, mine,
                COALESCE(branch, ''), COALESCE(commit_hash, ''), captured_at, updated_at
         FROM team_memories
-        WHERE project_id = ? AND status = 'active' AND mine = 0
+        WHERE project_id = ? AND status = 'active'
+          AND (mine = 0 OR NOT EXISTS (
+              SELECT 1 FROM memories m
+              WHERE m.project_id = team_memories.project_id AND m.team_uid = team_memories.uid))
         ORDER BY captured_at DESC, uid`, projectID)
 	if err != nil {
 		return nil, err
