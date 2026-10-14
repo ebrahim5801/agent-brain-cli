@@ -1,0 +1,392 @@
+[
+  {
+    "id": "replacement-codex",
+    "family": "replacement",
+    "host": "codex",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "latest_valid",
+      "persistence"
+    ]
+  },
+  {
+    "id": "replacement-claude-code",
+    "family": "replacement",
+    "host": "claude-code",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "latest_valid",
+      "persistence"
+    ]
+  },
+  {
+    "id": "chain-codex",
+    "family": "chain",
+    "host": "codex",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "latest_valid"
+    ]
+  },
+  {
+    "id": "chain-claude-code",
+    "family": "chain",
+    "host": "claude-code",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "latest_valid"
+    ]
+  },
+  {
+    "id": "assistant-claim-codex",
+    "family": "assistant-claim",
+    "host": "codex",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "freshness"
+    ]
+  },
+  {
+    "id": "assistant-claim-claude-code",
+    "family": "assistant-claim",
+    "host": "claude-code",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "freshness"
+    ]
+  },
+  {
+    "id": "quoted-codex",
+    "family": "quoted",
+    "host": "codex",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "freshness"
+    ]
+  },
+  {
+    "id": "quoted-claude-code",
+    "family": "quoted",
+    "host": "claude-code",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "freshness"
+    ]
+  },
+  {
+    "id": "missing-source-codex",
+    "family": "missing-source",
+    "host": "codex",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "freshness"
+    ]
+  },
+  {
+    "id": "missing-source-claude-code",
+    "family": "missing-source",
+    "host": "claude-code",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "freshness"
+    ]
+  },
+  {
+    "id": "changed-digest-codex",
+    "family": "changed-digest",
+    "host": "codex",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "freshness"
+    ]
+  },
+  {
+    "id": "changed-digest-claude-code",
+    "family": "changed-digest",
+    "host": "claude-code",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "freshness"
+    ]
+  },
+  {
+    "id": "completion-codex",
+    "family": "completion",
+    "host": "codex",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "persistence"
+    ]
+  },
+  {
+    "id": "completion-claude-code",
+    "family": "completion",
+    "host": "claude-code",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "persistence"
+    ]
+  },
+  {
+    "id": "scope-codex",
+    "family": "scope",
+    "host": "codex",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "latest_valid"
+    ]
+  },
+  {
+    "id": "scope-claude-code",
+    "family": "scope",
+    "host": "claude-code",
+    "split": "development",
+    "metrics": [
+      "decision_tracking",
+      "latest_valid"
+    ]
+  },
+  {
+    "id": "reasoning-codex",
+    "family": "reasoning",
+    "host": "codex",
+    "split": "development",
+    "metrics": [
+      "reasoning_evidence"
+    ]
+  },
+  {
+    "id": "reasoning-claude-code",
+    "family": "reasoning",
+    "host": "claude-code",
+    "split": "development",
+    "metrics": [
+      "reasoning_evidence"
+    ]
+  },
+  {
+    "id": "partial-recovery-codex",
+    "family": "partial-recovery",
+    "host": "codex",
+    "split": "heldout",
+    "metrics": [
+      "session_recovery",
+      "cross_agent",
+      "duplicate_prevention"
+    ]
+  },
+  {
+    "id": "partial-recovery-claude-code",
+    "family": "partial-recovery",
+    "host": "claude-code",
+    "split": "heldout",
+    "metrics": [
+      "session_recovery",
+      "cross_agent",
+      "duplicate_prevention"
+    ]
+  },
+  {
+    "id": "empty-capture-codex",
+    "family": "empty-capture",
+    "host": "codex",
+    "split": "heldout",
+    "metrics": [
+      "session_recovery",
+      "persistence"
+    ]
+  },
+  {
+    "id": "empty-capture-claude-code",
+    "family": "empty-capture",
+    "host": "claude-code",
+    "split": "heldout",
+    "metrics": [
+      "session_recovery",
+      "persistence"
+    ]
+  },
+  {
+    "id": "context-gap-codex",
+    "family": "context-gap",
+    "host": "codex",
+    "split": "heldout",
+    "metrics": [
+      "session_recovery"
+    ]
+  },
+  {
+    "id": "context-gap-claude-code",
+    "family": "context-gap",
+    "host": "claude-code",
+    "split": "heldout",
+    "metrics": [
+      "session_recovery"
+    ]
+  },
+  {
+    "id": "concurrent-retry-codex",
+    "family": "concurrent-retry",
+    "host": "codex",
+    "split": "heldout",
+    "metrics": [
+      "duplicate_prevention",
+      "persistence"
+    ]
+  },
+  {
+    "id": "concurrent-retry-claude-code",
+    "family": "concurrent-retry",
+    "host": "claude-code",
+    "split": "heldout",
+    "metrics": [
+      "duplicate_prevention",
+      "persistence"
+    ]
+  },
+  {
+    "id": "lost-ack-codex",
+    "family": "lost-ack",
+    "host": "codex",
+    "split": "heldout",
+    "metrics": [
+      "duplicate_prevention",
+      "persistence"
+    ]
+  },
+  {
+    "id": "lost-ack-claude-code",
+    "family": "lost-ack",
+    "host": "claude-code",
+    "split": "heldout",
+    "metrics": [
+      "duplicate_prevention",
+      "persistence"
+    ]
+  },
+  {
+    "id": "distinct-observations-codex",
+    "family": "distinct-observations",
+    "host": "codex",
+    "split": "heldout",
+    "metrics": [
+      "duplicate_prevention"
+    ]
+  },
+  {
+    "id": "distinct-observations-claude-code",
+    "family": "distinct-observations",
+    "host": "claude-code",
+    "split": "heldout",
+    "metrics": [
+      "duplicate_prevention"
+    ]
+  },
+  {
+    "id": "session-isolation-codex",
+    "family": "session-isolation",
+    "host": "codex",
+    "split": "heldout",
+    "metrics": [
+      "cross_agent"
+    ]
+  },
+  {
+    "id": "session-isolation-claude-code",
+    "family": "session-isolation",
+    "host": "claude-code",
+    "split": "heldout",
+    "metrics": [
+      "cross_agent"
+    ]
+  },
+  {
+    "id": "contradiction-codex",
+    "family": "contradiction",
+    "host": "codex",
+    "split": "heldout",
+    "metrics": [
+      "contradiction"
+    ]
+  },
+  {
+    "id": "contradiction-claude-code",
+    "family": "contradiction",
+    "host": "claude-code",
+    "split": "heldout",
+    "metrics": [
+      "contradiction"
+    ]
+  },
+  {
+    "id": "source-freshness-codex",
+    "family": "source-freshness",
+    "host": "codex",
+    "split": "heldout",
+    "metrics": [
+      "freshness"
+    ]
+  },
+  {
+    "id": "source-freshness-claude-code",
+    "family": "source-freshness",
+    "host": "claude-code",
+    "split": "heldout",
+    "metrics": [
+      "freshness"
+    ]
+  },
+  {
+    "id": "injection-codex",
+    "family": "injection",
+    "host": "codex",
+    "split": "heldout",
+    "metrics": [
+      "freshness"
+    ]
+  },
+  {
+    "id": "injection-claude-code",
+    "family": "injection",
+    "host": "claude-code",
+    "split": "heldout",
+    "metrics": [
+      "freshness"
+    ]
+  },
+  {
+    "id": "legacy-compatibility-codex",
+    "family": "legacy-compatibility",
+    "host": "codex",
+    "split": "development",
+    "metrics": [
+      "retrieval",
+      "persistence"
+    ]
+  },
+  {
+    "id": "legacy-compatibility-claude-code",
+    "family": "legacy-compatibility",
+    "host": "claude-code",
+    "split": "development",
+    "metrics": [
+      "retrieval",
+      "persistence"
+    ]
+  }
+]
