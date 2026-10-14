@@ -30,6 +30,10 @@ func newMemoryCmd() *cobra.Command {
 		Short: "Inspect and control per-project personal memory (Pro)",
 	}
 	cmd.AddCommand(
+		newMemoryHistoryCmd(),
+		newMemoryV2StatusCmd(),
+		newMemoryReviewCmd(),
+		newMemoryUpgradeV2Cmd(),
 		newMemoryEnableCmd(),
 		newMemoryDisableCmd(),
 		newMemoryListCmd(),
@@ -192,7 +196,24 @@ func newMemoryShowCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			pid, _, found, err := currentProject(st)
+			if err != nil {
+				return err
+			}
+			if !found || pid != m.ProjectID {
+				return store.ErrMemoryNotFound
+			}
 			dir, _ := os.Getwd()
+			entries, err := memory.List(st, pid, dir, true, cliGitBudget)
+			if err != nil {
+				return err
+			}
+			for _, entry := range entries {
+				if entry.Entry.ID == id {
+					m = entry.Entry
+					break
+				}
+			}
 			fresh := gitstate.NewComparer(dir, cliGitBudget).Compare(m.Branch.String, m.CommitHash.String)
 
 			fmt.Printf("id:        %d\n", m.ID)
@@ -206,6 +227,10 @@ func newMemoryShowCmd() *cobra.Command {
 				status += ", edited"
 			}
 			fmt.Printf("status:    %s\n", status)
+			fmt.Printf("verification: %s (last checked %s)\n", m.Verification, m.VerifiedAt)
+			if m.Details.Rationale != "" {
+				fmt.Printf("rationale: %s\n", m.Details.Rationale)
+			}
 			fmt.Printf("captured:  %s\n", m.CapturedAt)
 			branch, commit := m.Branch.String, m.CommitHash.String
 			if !m.CommitHash.Valid {
@@ -334,7 +359,7 @@ func newMemoryDeleteCmd() *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
 		Use:   "delete <id>",
-		Short: "Permanently delete a memory entry",
+		Short: "Soft-delete a memory entry (restorable)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := parseMemoryID(args[0])

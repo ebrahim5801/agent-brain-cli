@@ -74,6 +74,9 @@ func TestTransferColumnsCoverSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.Close()
+	if err := st.UpgradeMemoryV2(); err != nil {
+		t.Fatal(err)
+	}
 	for _, spec := range transferColumns {
 		rows, err := st.DB.Query(`SELECT name FROM pragma_table_info(?)`, spec.table)
 		if err != nil {

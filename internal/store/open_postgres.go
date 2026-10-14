@@ -33,5 +33,11 @@ func OpenPostgres(dsn string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	v, err := s.SchemaVersion()
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	s.MemoryV2 = v >= 16
 	return s, nil
 }

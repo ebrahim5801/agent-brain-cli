@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,42 @@ import (
 	"github.com/ebrahim5801/agent-brain-cli/internal/assistant"
 	"github.com/ebrahim5801/agent-brain-cli/wire"
 )
+
+func TestSubagentContentRedactedBeforeTruncation(t *testing.T) {
+	for _, prefix := range []string{"", strings.Repeat("x", maxReportBytes-11) + " "} {
+		main := writeSubagentFixture(t)
+		dir := subagentsDir(main)
+		content := prefix + "ghp_abcdefghij1234567890KLMNOP"
+		var transcript strings.Builder
+		for _, role := range []string{"user", "assistant"} {
+			line, err := json.Marshal(map[string]any{"type": role, "timestamp": "2026-07-15T14:18:31Z", "message": map[string]any{"content": content}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			transcript.Write(line)
+			transcript.WriteByte('\n')
+		}
+		if err := os.WriteFile(filepath.Join(dir, "agent-abc123.jsonl"), []byte(transcript.String()), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		meta, err := json.Marshal(map[string]string{"description": content})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "agent-abc123.meta.json"), meta, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		agents := Adapter{}.ScanSubagents(assistant.HookInput{TranscriptPath: main})
+		if len(agents) != 1 {
+			t.Fatalf("got %d agents", len(agents))
+		}
+		for _, got := range []string{agents[0].Prompt, agents[0].Summary} {
+			if strings.Contains(got, "ghp_") || !strings.Contains(got, "[redacted:") {
+				t.Error("subagent content retains a secret or lacks redaction")
+			}
+		}
+	}
+}
 
 const agentJSONL = `{"parentUuid":null,"isSidechain":true,"agentId":"abc123","type":"user","message":{"role":"user","content":"Review the client code for bugs"},"timestamp":"2026-07-15T14:18:31.580Z"}
 {"type":"assistant","timestamp":"2026-07-15T14:20:00.000Z","requestId":"req_1","message":{"id":"msg_1","model":"claude-fable-5","content":[{"type":"thinking","thinking":"hmm"},{"type":"text","text":"Working on it."}],"usage":{"input_tokens":10,"output_tokens":20,"cache_creation_input_tokens":30,"cache_read_input_tokens":40}}}

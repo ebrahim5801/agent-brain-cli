@@ -46,7 +46,7 @@ const (
 // Gemini/Copilot's per-event hook entries, OpenCode's single plugin file
 // either carries all of these (installed) or none (absent) — there is no
 // partial-by-event state on disk.
-var hookEvents = []string{assistant.EventSessionStart, assistant.EventModelUsage, assistant.EventStop}
+var hookEvents = []string{assistant.EventSessionStart, assistant.EventPrompt, assistant.EventToolUse, assistant.EventModelUsage, assistant.EventStop}
 
 func configDir() (string, error) {
 	if v := os.Getenv("AGENT_BRAIN_OPENCODE_HOME"); v != "" {
@@ -117,10 +117,16 @@ const AGENT_BRAIN_BIN = %q;
 async function fire(input, event, payload) {
   try {
     const json = JSON.stringify(payload);
-    await input.$`+"`echo ${json} | ${AGENT_BRAIN_BIN} hook ${event} --assistant opencode`"+`.nothrow().quiet();
+    const result = await input.$`+"`echo ${json} | ${AGENT_BRAIN_BIN} hook ${event} --assistant opencode`"+`.nothrow().quiet();
+    return String(result.stdout || "");
   } catch {
     // Swallow: a collector failure must never surface to the assistant.
   }
+  return "";
+}
+
+function contextText(raw) {
+ try { const value = JSON.parse(raw); return value.hookSpecificOutput?.additionalContext || value.additionalContext || value.reason || ""; } catch { return ""; }
 }
 
 export const AgentBrainPlugin = async (input) => {
@@ -131,19 +137,58 @@ export const AgentBrainPlugin = async (input) => {
   // than once per message id would multiply the true usage. Report each
   // message's usage exactly once.
   const reportedUsage = new Set();
+  const context = new Map();
+  const captureReasons = new Map();
+  const continuing = new Set();
+  const knownSessions = new Set();
+  async function queue(event, sid, extra = {}) {
+    if (!sid) return "";
+    knownSessions.add(sid);
+    const text = contextText(await fire(input,event,{session_id:sid,cwd,...extra}));
+    if (text) context.set(sid,(context.get(sid) || "") + "\n" + text);
+    return text;
+  }
   return {
+    "chat.message": async (hook, output) => {
+      const sid = hook.sessionID;
+      if (!sid) return;
+      // A capture continuation is control context, never a new user turn.
+      if (output.parts?.some(p => p.type === "text" && p.text === captureReasons.get(sid))) return;
+      await queue("prompt",sid);
+    },
+    "tool.execute.after": async (hook) => { await queue("tool-use",hook.sessionID,{tool_name:hook.tool || ""}); },
+    "experimental.chat.system.transform": async (hook, output) => {
+      if (!hook.sessionID) return; // no project-global fallback
+      if (!context.has(hook.sessionID)) await queue("session-start",hook.sessionID);
+      const text = context.get(hook.sessionID);
+      if (text) { output.system.push(text); context.delete(hook.sessionID); }
+    },
     event: async ({ event }) => {
       try {
         switch (event.type) {
-          case "session.created":
-            await fire(input, "session-start", { session_id: event?.properties?.sessionID, cwd });
+          case "session.created": {
+            const info = event?.properties?.info;
+            // The event stream can include other workspace sessions. Only
+            // direct scoped hooks or a matching directory establish membership.
+            if (info?.directory !== cwd) break;
+            await queue("session-start",info.id);
             break;
+          }
           case "session.idle":
-            await fire(input, "stop", { session_id: event?.properties?.sessionID, cwd });
+            {
+              const sid = event?.properties?.sessionID;
+              if (!sid || !knownSessions.has(sid) || continuing.has(sid)) break;
+              const reason = contextText(await fire(input,"stop",{session_id:sid,cwd}));
+              if (reason && input.client?.session?.prompt) {
+                captureReasons.set(sid,reason); continuing.add(sid);
+                try { await input.client.session.prompt({path:{id:sid},body:{parts:[{type:"text",text:reason}]}}); }
+                finally { continuing.delete(sid); }
+              }
+            }
             break;
           case "message.updated": {
             const info = event?.properties?.info;
-            if (info && info.role === "assistant" && info.finish && info.tokens && !reportedUsage.has(info.id)) {
+            if (info && knownSessions.has(info.sessionID) && info.role === "assistant" && info.finish && info.tokens && !reportedUsage.has(info.id)) {
               reportedUsage.add(info.id);
               await fire(input, "model-usage", {
                 session_id: info.sessionID,
@@ -371,7 +416,7 @@ func State() (assistant.State, error) {
 	s.MCPRegistered = mcp
 	s.Tier = assistant.DeriveTier(s.HookEvents, s.HookEventsWanted, s.MCPRegistered)
 	if s.Integrated() {
-		s.Notes = append(s.Notes, "no session-end, prompt, or tool-use capture; no injection or distillation yet (see plans/spikes/opencode.md)")
+		s.Notes = append(s.Notes, "OpenCode V1 scoped plugin context/capture; no reliable session-end; OpenCode V2 plugin API requires separate host qualification; MCP remains available")
 	}
 	return s, nil
 }

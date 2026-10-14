@@ -77,6 +77,9 @@ func DataTables() []string {
 // CountRows returns the row count of one of agent-brain's own tables. The table
 // name comes from DataTables (a fixed allowlist), never user input.
 func (s *Store) CountRows(table string) (int64, error) {
+	if isV2Table(table) && !s.MemoryV2 {
+		return 0, nil
+	}
 	var n int64
 	err := s.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n)
 	return n, err
@@ -115,6 +118,10 @@ func (src *Store) TransferTo(dst *Store) ([]TableCount, error) {
 		return nil, fmt.Errorf("TransferTo copies sqlite→postgres, got %s→%s", src.Backend, dst.Backend)
 	}
 
+	if src.MemoryV2 {
+		return src.transferV2(dst)
+	}
+
 	// Snapshot: a read transaction on the single SQLite connection gives every
 	// table SELECT the same view. Rollback (never commit) — the source is
 	// read-only in practice and must stay logically untouched (FR-004).
@@ -127,6 +134,9 @@ func (src *Store) TransferTo(dst *Store) ([]TableCount, error) {
 	copiedMax := map[string]int64{} // per identity table: highest id copied so far
 
 	for _, t := range transferColumns {
+		if isV2Table(t.table) && !src.MemoryV2 {
+			continue
+		}
 		if t.table == "memories" {
 			maxID, err := copyMemories(snap, dst, t.cols)
 			if err != nil {
@@ -159,6 +169,9 @@ func (src *Store) TransferTo(dst *Store) ([]TableCount, error) {
 	for attempt := 0; attempt < deltaAttempts; attempt++ {
 		copiedAny := false
 		for _, table := range identityTables {
+			if isV2Table(table) && !src.MemoryV2 {
+				continue
+			}
 			cols := columnsFor(table)
 			where := fmt.Sprintf("id > %d", copiedMax[table])
 			var maxID int64
@@ -394,6 +407,9 @@ func copyMemoriesWhere(src querier, dst *Store, cols []string, where string) (in
 // max(id) so future inserts on Postgres don't collide with preserved ids.
 func resetSequences(dst *Store) error {
 	for _, table := range identityTables {
+		if isV2Table(table) && !dst.MemoryV2 {
+			continue
+		}
 		if _, err := dst.Exec(
 			`SELECT setval(pg_get_serial_sequence(?, 'id'), (SELECT COALESCE(MAX(id), 1) FROM `+table+`))`,
 			table); err != nil {
@@ -407,11 +423,12 @@ func resetSequences(dst *Store) error {
 func tableCounts(src, dst *Store) ([]TableCount, error) {
 	out := make([]TableCount, 0, len(transferColumns))
 	for _, t := range transferColumns {
-		var sc, pc int64
-		if err := src.QueryRow(`SELECT COUNT(*) FROM ` + t.table).Scan(&sc); err != nil {
+		sc, err := src.CountRows(t.table)
+		if err != nil {
 			return nil, err
 		}
-		if err := dst.QueryRow(`SELECT COUNT(*) FROM ` + t.table).Scan(&pc); err != nil {
+		pc, err := dst.CountRows(t.table)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, TableCount{Table: t.table, SQLite: sc, Postgres: pc})

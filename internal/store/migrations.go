@@ -198,40 +198,73 @@ CREATE INDEX idx_memories_priority ON memories(project_id, priority) WHERE statu
 // collapsed baseline as versions 1..8 and then appends future migrations in
 // lockstep with SQLite (see migrations_postgres.go); numbering stays aligned so
 // one version number always means one schema state across both backends.
+//
+// Steps are selected by the schema version they record, never by their index in
+// the slice: the Postgres baseline is one step carrying eight versions, so an
+// index is not a version there and comparing the two skips every migration
+// appended after the baseline.
 func migrate(db *sql.DB, backend Backend) error {
-	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+	return migrateTo(db, backend, 15)
+}
+
+func migrateTo(db *sql.DB, backend Backend, target int) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	// Lock before discovering the version, including creation of the version
+	// table. SQLite uses BEGIN IMMEDIATE; PostgreSQL needs a transaction lock
+	// shared by separate hook/MCP processes, not merely an in-process mutex.
+	if backend == BackendPostgres {
+		if _, err := tx.Exec(`SELECT pg_advisory_xact_lock(1094861644, 1)`); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
         version    BIGINT PRIMARY KEY,
         applied_at TEXT NOT NULL
     )`); err != nil {
 		return err
 	}
 	var current int
-	if err := db.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&current); err != nil {
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&current); err != nil {
 		return err
+	}
+	if current > len(migrations) {
+		return fmt.Errorf("store schema %d needs a newer compatible binary", current)
 	}
 	steps := migrationSteps(backend)
 	insertVersion := rebind(backend, `INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`)
-	for i := current; i < len(steps); i++ {
-		step := steps[i]
-		tx, err := db.Begin()
-		if err != nil {
-			return err
+	for _, step := range pendingSteps(steps, current) {
+		if step.topVersion() > target {
+			continue
 		}
 		if _, err := tx.Exec(step.ddl); err != nil {
-			tx.Rollback()
 			return fmt.Errorf("migration %v: %w", step.versions, err)
 		}
 		for _, v := range step.versions {
 			if _, err := tx.Exec(insertVersion, v, Now()); err != nil {
-				tx.Rollback()
 				return fmt.Errorf("migration %v: %w", step.versions, err)
 			}
 		}
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("migration %v: %w", step.versions, err)
+	}
+	return tx.Commit()
+}
+
+// pendingSteps returns the steps that still need applying at schema version
+// `current`, selected by the versions a step records rather than its position in
+// the slice. Index and version coincide only for SQLite; the Postgres baseline
+// is a single step carrying eight versions, so indexing by version there skips
+// every migration appended after the baseline.
+func pendingSteps(steps []migrationStep, current int) []migrationStep {
+	pending := make([]migrationStep, 0, len(steps))
+	for _, s := range steps {
+		if s.topVersion() > current {
+			pending = append(pending, s)
 		}
 	}
-	return nil
+	return pending
 }
 
 // migrationStep is one applied unit: a DDL blob plus the schema_migrations
@@ -242,10 +275,22 @@ type migrationStep struct {
 	versions []int
 }
 
-// migrationSteps returns the ordered migration units for a backend. The slice
-// is walked by index against the current MAX(version): SQLite's Nth step is
-// version N, and Postgres's baseline occupies the first `baseline` versions so
-// that appended entries line up with SQLite from version 9 on.
+// topVersion is the highest schema version this step records. A step is applied
+// in one transaction, so the store is at topVersion() or has none of the step.
+func (s migrationStep) topVersion() int {
+	top := 0
+	for _, v := range s.versions {
+		if v > top {
+			top = v
+		}
+	}
+	return top
+}
+
+// migrationSteps returns the ordered migration units for a backend, in
+// ascending version order: SQLite's Nth step is version N, and Postgres's
+// baseline occupies the first `baseline` versions so that appended entries line
+// up with SQLite from version 9 on.
 func migrationSteps(backend Backend) []migrationStep {
 	if backend == BackendPostgres {
 		steps := make([]migrationStep, 0, 1+len(migrationsPostgres))

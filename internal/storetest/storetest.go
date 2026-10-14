@@ -38,6 +38,9 @@ func SQLite(t *testing.T) *store.Store {
 func Postgres(t *testing.T) *store.Store {
 	t.Helper()
 	base := os.Getenv(PGEnv)
+	if base == "" && os.Getenv("AGENT_BRAIN_REQUIRE_PG") == "1" {
+		t.Fatal("required PostgreSQL backend has no isolated test DSN")
+	}
 	if base == "" {
 		t.Skipf("%s not set; skipping Postgres backend test", PGEnv)
 	}
@@ -71,21 +74,13 @@ func Postgres(t *testing.T) *store.Store {
 func PostgresDSN(t *testing.T) string {
 	t.Helper()
 	base := os.Getenv(PGEnv)
+	if base == "" && os.Getenv("AGENT_BRAIN_REQUIRE_PG") == "1" {
+		t.Fatal("required PostgreSQL backend has no isolated test DSN")
+	}
 	if base == "" {
 		t.Skipf("%s not set; skipping Postgres backend test", PGEnv)
 	}
-	schema := "abtest_" + randHex(t)
-	boot, err := sql.Open("pgx", base)
-	if err != nil {
-		t.Fatalf("open bootstrap pg conn: %v", err)
-	}
-	if _, err := boot.Exec("CREATE SCHEMA " + schema); err != nil {
-		boot.Close()
-		t.Fatalf("create schema %s: %v", schema, err)
-	}
-	boot.Close()
-	t.Cleanup(func() { dropSchema(base, schema) })
-	return withSearchPath(t, base, schema)
+	return SchemaDSN(t, base)
 }
 
 // Backend names a store the matrix should run against.
@@ -99,6 +94,9 @@ type Backend struct {
 // opened and cleaned up via t.Cleanup.
 func Both(t *testing.T) []Backend {
 	t.Helper()
+	if os.Getenv("AGENT_BRAIN_REQUIRE_PG") == "1" && os.Getenv(PGEnv) == "" {
+		t.Fatal("required PostgreSQL backend was not configured")
+	}
 	backends := []Backend{{Name: "sqlite", Store: SQLite(t)}}
 	if os.Getenv(PGEnv) != "" {
 		backends = append(backends, Backend{Name: "postgres", Store: Postgres(t)})
@@ -134,4 +132,23 @@ func randHex(t *testing.T) string {
 		t.Fatalf("rand: %v", err)
 	}
 	return hex.EncodeToString(buf[:])
+}
+
+// SchemaDSN creates an isolated schema for any scratch PostgreSQL DSN, including
+// the cloud regression suite. This prevents global sequence assertions racing
+// unrelated package fixtures in the same public schema.
+func SchemaDSN(t *testing.T, base string) string {
+	t.Helper()
+	schema := "abtest_" + randHex(t)
+	boot, err := sql.Open("pgx", base)
+	if err != nil {
+		t.Fatalf("open bootstrap pg conn: %v", err)
+	}
+	if _, err := boot.Exec("CREATE SCHEMA " + schema); err != nil {
+		boot.Close()
+		t.Fatalf("create schema %s: %v", schema, err)
+	}
+	boot.Close()
+	t.Cleanup(func() { dropSchema(base, schema) })
+	return withSearchPath(t, base, schema)
 }

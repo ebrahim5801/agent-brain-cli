@@ -71,9 +71,7 @@ func (Adapter) StopResponse(reason string) string {
 // MidTurnResponse wraps the checkpoint prompt in the same blocking decision
 // envelope, used on the tool-use hook to save interim memory mid-turn
 // (assistant.MidTurnResponder).
-func (Adapter) MidTurnResponse(reason string) string {
-	return blockDecision(reason)
-}
+func (a Adapter) MidTurnResponse(reason string) string { return a.ToolUseInjectionResponse(reason) }
 
 func blockDecision(reason string) string {
 	out, err := json.Marshal(map[string]string{

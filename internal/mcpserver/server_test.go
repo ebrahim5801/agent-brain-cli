@@ -64,10 +64,9 @@ func TestMCPSaveIsAssistantBlindAndServesBack(t *testing.T) {
 	}
 }
 
-// A save made while the project has tracked sessions is attributed to the
-// newest one (the session the distillation prompt runs in); with no session
-// yet, session_id stays NULL per the data-model contract.
-func TestMCPSaveAttributesLatestSession(t *testing.T) {
+// Attribution requires a validated per-request handle. Concurrent tracked
+// sessions never make an unbound save inherit the newest session.
+func TestMCPSaveRequiresExplicitAttribution(t *testing.T) {
 	cfgDir := t.TempDir()
 	t.Setenv("AGENT_BRAIN_CONFIG_DIR", cfgDir)
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -87,10 +86,10 @@ func TestMCPSaveAttributesLatestSession(t *testing.T) {
 	defer st.Close()
 	s := New(st, dir, "test")
 
-	save := func(content string) store.Memory {
+	save := func(content, handle string) store.Memory {
 		t.Helper()
 		res, _, err := s.save(context.Background(), &mcp.CallToolRequest{}, saveIn{
-			Content: content, Kind: "fact", Origin: "auto",
+			SessionHandle: handle, Content: content, Kind: "fact", Origin: "auto",
 		})
 		if err != nil {
 			t.Fatalf("save: %v", err)
@@ -107,7 +106,7 @@ func TestMCPSaveAttributesLatestSession(t *testing.T) {
 		return m
 	}
 
-	if m := save("saved before any session"); m.SessionID.Valid {
+	if m := save("saved before any session", ""); m.SessionID.Valid {
 		t.Errorf("session with no sessions = %v, want NULL", m.SessionID)
 	}
 
@@ -121,12 +120,25 @@ func TestMCPSaveAttributesLatestSession(t *testing.T) {
 	if _, err := st.EnsureSession("sess-old", pid, store.Now(), "", "claude-code"); err != nil {
 		t.Fatal(err)
 	}
-	newest, err := st.EnsureSession("sess-new", pid, "2999-01-01T00:00:00Z", "", "claude-code")
+	_, err = st.EnsureSession("sess-new", pid, "2999-01-01T00:00:00Z", "", "claude-code")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if m := save("saved mid-session"); !m.SessionID.Valid || m.SessionID.Int64 != newest {
-		t.Errorf("session = %v, want %d", m.SessionID, newest)
+	if m := save("saved with ambiguous sessions", ""); m.SessionID.Valid {
+		t.Fatal("newest session guessed")
+	}
+	if err := st.UpgradeMemoryV2(); err != nil {
+		t.Fatal(err)
+	}
+	b, err := st.EnsureBoundSession(pid, "claude-code", "older", dir, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.EnsureBoundSession(pid, "codex", "newer", dir, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if m := save("correct older session", b.Handle); !m.SessionID.Valid || m.SessionID.Int64 != b.SessionID {
+		t.Fatalf("explicit identity lost: %+v", m)
 	}
 }

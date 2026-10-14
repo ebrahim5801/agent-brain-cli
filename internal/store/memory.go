@@ -22,6 +22,12 @@ const (
 )
 
 type Memory struct {
+	Details      MemoryDetails
+	Verification string
+	VerifiedAt   string
+	Revision     int64
+	Conflicted   bool
+	ConflictRefs string
 	ID           int64
 	ProjectID    int64
 	SessionID    sql.NullInt64
@@ -56,6 +62,7 @@ func scanMemory(row interface{ Scan(...any) error }) (Memory, error) {
 	var edited intBool
 	err := row.Scan(&m.ID, &m.ProjectID, &m.SessionID, &m.Content, &m.Kind, &m.Origin,
 		&m.Priority, &m.Status, &m.SupersededBy, &m.Branch, &m.CommitHash, &m.CapturedAt, &m.UpdatedAt, &edited)
+	m.Verification = "unverified"
 	m.Edited = bool(edited)
 	return m, err
 }
@@ -80,6 +87,10 @@ type NewMemory struct {
 }
 
 func (s *Store) InsertMemory(m NewMemory, at string) (int64, error) {
+	return insertMemory(s.QueryRow, m, at)
+}
+
+func insertMemory(queryRow func(string, ...any) *sql.Row, m NewMemory, at string) (int64, error) {
 	var sessionID any
 	if m.SessionID != 0 {
 		sessionID = m.SessionID
@@ -99,12 +110,59 @@ func (s *Store) InsertMemory(m NewMemory, at string) (int64, error) {
 	// RETURNING id unifies both backends (modernc.org/sqlite supports it), so
 	// this path has no LastInsertId() divergence to special-case per dialect.
 	var id int64
-	err := s.QueryRow(`
+	err := queryRow(`
         INSERT INTO memories (project_id, session_id, content, kind, origin, priority, branch, commit_hash, captured_at, updated_at, personal_only, team_uid)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id`,
 		m.ProjectID, sessionID, m.Content, m.Kind, m.Origin, priority, branch, commit, at, at, m.PersonalOnly, teamUID).Scan(&id)
 	return id, err
+}
+
+// InsertMemorySuperseding commits the new entry and all of its replacement
+// links together. A database failure must not leave two contradictory active
+// decisions behind, or a retry would duplicate the replacement. Invalid IDs
+// remain per-ID rejections, as on the original non-transactional save path.
+func (s *Store) InsertMemorySuperseding(m NewMemory, supersedes []int64, teamUIDs []string, at string) (int64, []int64, map[int64]string, error) {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	defer tx.Rollback()
+	id, err := insertMemory(func(q string, args ...any) *sql.Row {
+		return tx.QueryRow(s.Rebind(q), normalizeArgs(args)...)
+	}, m, at)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	var accepted []int64
+	rejected := map[int64]string{}
+	for _, oldID := range supersedes {
+		if oldID == id {
+			rejected[oldID] = "cannot supersede itself"
+			continue
+		}
+		err := supersedeMemory(func(q string, args ...any) (sql.Result, error) {
+			return s.ExecTx(tx, q, args...)
+		}, oldID, id, m.ProjectID, at)
+		switch {
+		case err == nil:
+			accepted = append(accepted, oldID)
+		case errors.Is(err, ErrMemoryNotFound):
+			rejected[oldID] = "not an active entry of this project"
+		default:
+			return 0, nil, nil, err
+		}
+	}
+	for _, uid := range teamUIDs {
+		if _, err := s.ExecTx(tx, `INSERT INTO memory_team_supersedes (memory_id, team_uid) VALUES (?, ?)
+            ON CONFLICT(memory_id, team_uid) DO NOTHING`, id, uid); err != nil {
+			return 0, nil, nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, nil, nil, err
+	}
+	return id, accepted, rejected, nil
 }
 
 // PendingMemory is a distilled entry queued for contribution to the team pool.
@@ -131,6 +189,9 @@ type PendingMemory struct {
 // (memory_team_supersedes — the cross-author path). The server applies the
 // same-author/cross-author rule to each uid.
 func (s *Store) PendingContributions(projectID int64) ([]PendingMemory, error) {
+	if err := s.AssertMemoryCapability(); err != nil {
+		return nil, err
+	}
 	// group_concat (SQLite) and string_agg (Postgres) both comma-join the
 	// superseded team_uids into one scalar; uuids never contain commas.
 	agg := "group_concat(u)"
@@ -166,7 +227,14 @@ func (s *Store) PendingContributions(projectID int64) ([]PendingMemory, error) {
 		}
 		out = append(out, p)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if s.MemoryV2 {
+		return s.filterContributions(projectID, out)
+	}
+	return out, nil
 }
 
 // MarkShared records the server ack for a contributed entry (idempotent: called
@@ -225,6 +293,9 @@ func (s *Store) ShareErrors(projectID int64) ([]ShareErrorEntry, error) {
 // never been queued for sharing — the selective-seeding candidates offered on
 // first grant (FR-016, R13).
 func (s *Store) UnsharedMemories(projectID int64) ([]Memory, error) {
+	if err := s.AssertMemoryCapability(); err != nil {
+		return nil, err
+	}
 	rows, err := s.Query(`SELECT `+memoryColumns+`
         FROM memories
         WHERE project_id = ? AND status = 'active' AND personal_only = 0 AND team_uid IS NULL
@@ -241,7 +312,30 @@ func (s *Store) UnsharedMemories(projectID int64) ([]Memory, error) {
 		}
 		out = append(out, m)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if s.MemoryV2 {
+		snap, err := s.MemorySnapshot(projectID, map[string]bool{"*": true})
+		if err != nil {
+			return nil, err
+		}
+		eligible := map[int64]Memory{}
+		for _, m := range snap.Entries {
+			if m.Status == MemoryActive && m.Details.Scope == "" {
+				eligible[m.ID] = m
+			}
+		}
+		filtered := out[:0]
+		for _, m := range out {
+			if effective, ok := eligible[m.ID]; ok {
+				filtered = append(filtered, effective)
+			}
+		}
+		out = filtered
+	}
+	return out, nil
 }
 
 // MintShareUID makes an existing entry contribution-eligible by minting a
@@ -263,6 +357,23 @@ func (s *Store) GetMemory(id int64) (Memory, error) {
 // ListMemories returns a project's entries newest-first, active first when
 // superseded entries are included.
 func (s *Store) ListMemories(projectID int64, includeSuperseded bool) ([]Memory, error) {
+	if err := s.AssertMemoryCapability(); err != nil {
+		return nil, err
+	}
+	if s.MemoryV2 {
+		snapshot, err := s.MemorySnapshot(projectID, map[string]bool{"*": true})
+		if err != nil {
+			return nil, err
+		}
+		var out []Memory
+		for _, m := range snapshot.Entries {
+			if includeSuperseded || m.Status == MemoryActive {
+				out = append(out, m)
+			}
+		}
+		return out, nil
+	}
+
 	q := `SELECT ` + memoryColumns + ` FROM memories WHERE project_id = ? AND status = 'active' ORDER BY captured_at DESC, id DESC`
 	if includeSuperseded {
 		q = `SELECT ` + memoryColumns + ` FROM memories WHERE project_id = ?
@@ -285,6 +396,9 @@ func (s *Store) ListMemories(projectID int64, includeSuperseded bool) ([]Memory,
 }
 
 func (s *Store) UpdateMemoryContent(id int64, content, at string) error {
+	if s.MemoryV2 {
+		return s.updateMemoryV2(id, content, at, false)
+	}
 	res, err := s.Exec(`UPDATE memories SET content = ?, edited = 1, updated_at = ? WHERE id = ?`, content, at, id)
 	return oneRow(res, err)
 }
@@ -293,24 +407,15 @@ func (s *Store) UpdateMemoryContent(id int64, content, at string) error {
 // backs the calibration check: self-assigned priority is only useful while
 // critical stays rare, and the share is the only way to notice that it has not.
 func (s *Store) MemoryPriorityCounts(projectID int64) (map[string]int, error) {
-	rows, err := s.Query(`
-        SELECT priority, COUNT(*) FROM memories
-        WHERE project_id = ? AND status = 'active'
-        GROUP BY priority`, projectID)
+	entries, err := s.ListMemories(projectID, false)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	out := map[string]int{}
-	for rows.Next() {
-		var priority string
-		var n int
-		if err := rows.Scan(&priority, &n); err != nil {
-			return nil, err
-		}
-		out[priority] += n
+	for _, m := range entries {
+		out[m.Priority]++
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // MemoryShared reports whether an entry has already been contributed to the
@@ -340,7 +445,11 @@ func (s *Store) UpdateMemoryPriority(id int64, priority, at string) error {
 // entries of the same project supersede, so a stale or cross-project ID from
 // the assistant is rejected rather than silently corrupting another entry.
 func (s *Store) SupersedeMemory(id, byID, projectID int64, at string) error {
-	res, err := s.Exec(`
+	return supersedeMemory(s.Exec, id, byID, projectID, at)
+}
+
+func supersedeMemory(exec func(string, ...any) (sql.Result, error), id, byID, projectID int64, at string) error {
+	res, err := exec(`
         UPDATE memories SET status = ?, superseded_by = ?, updated_at = ?
         WHERE id = ? AND project_id = ? AND status = ?`,
 		MemorySuperseded, byID, at, id, projectID, MemoryActive)
@@ -350,6 +459,9 @@ func (s *Store) SupersedeMemory(id, byID, projectID int64, at string) error {
 // RestoreMemory re-activates an entry that was superseded or deleted, undoing
 // either soft transition.
 func (s *Store) RestoreMemory(id int64, at string) error {
+	if s.MemoryV2 {
+		return s.restoreMemoryV2(id, at)
+	}
 	res, err := s.Exec(`UPDATE memories SET status = ?, superseded_by = NULL, updated_at = ? WHERE id = ? AND status IN (?, ?)`,
 		MemoryActive, at, id, MemorySuperseded, MemoryDeleted)
 	return oneRow(res, err)
@@ -359,6 +471,9 @@ func (s *Store) RestoreMemory(id int64, at string) error {
 // immediately (FR-016) but the row is retained so `memory restore` can recover
 // it. The content is never physically dropped by a developer delete.
 func (s *Store) DeleteMemory(id int64, at string) error {
+	if s.MemoryV2 {
+		return s.updateMemoryV2(id, "", at, true)
+	}
 	res, err := s.Exec(`UPDATE memories SET status = ?, updated_at = ? WHERE id = ? AND status != ?`,
 		MemoryDeleted, at, id, MemoryDeleted)
 	return oneRow(res, err)
@@ -368,6 +483,9 @@ func (s *Store) DeleteMemory(id int64, at string) error {
 // project, returning how many were affected. The rows are retained (restorable
 // per entry) rather than physically removed.
 func (s *Store) WipeProjectMemories(projectID int64, at string) (int64, error) {
+	if s.MemoryV2 {
+		return s.wipeMemoriesV2(projectID, at)
+	}
 	res, err := s.Exec(`UPDATE memories SET status = ?, updated_at = ? WHERE project_id = ? AND status != ?`,
 		MemoryDeleted, at, projectID, MemoryDeleted)
 	if err != nil {

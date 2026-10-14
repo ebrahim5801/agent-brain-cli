@@ -94,8 +94,8 @@ func TestFreshInstall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InstalledEventCount: %v", err)
 	}
-	if n != 3 {
-		t.Errorf("expected 3 installed events, got %d", n)
+	if n != 5 {
+		t.Errorf("expected 5 installed events, got %d", n)
 	}
 }
 
@@ -305,8 +305,8 @@ func TestStateMatrix(t *testing.T) {
 		if s.Tier != assistant.TierNotIntegrated {
 			t.Errorf("expected TierNotIntegrated, got %v", s.Tier)
 		}
-		if s.HookEventsWanted != 3 {
-			t.Errorf("expected HookEventsWanted 3, got %d", s.HookEventsWanted)
+		if s.HookEventsWanted != 5 {
+			t.Errorf("expected HookEventsWanted 5, got %d", s.HookEventsWanted)
 		}
 	})
 
@@ -323,8 +323,8 @@ func TestStateMatrix(t *testing.T) {
 		if s.Tier != assistant.TierFull {
 			t.Errorf("expected TierFull, got %v", s.Tier)
 		}
-		if s.HookEvents != 3 || !s.MCPRegistered {
-			t.Errorf("expected 3 hook events + mcp, got %d events, mcp=%v", s.HookEvents, s.MCPRegistered)
+		if s.HookEvents != 5 || !s.MCPRegistered {
+			t.Errorf("expected 5 hook events + mcp, got %d events, mcp=%v", s.HookEvents, s.MCPRegistered)
 		}
 		if len(s.Notes) == 0 {
 			t.Errorf("expected an honest capability-gap note (no injection/distillation), got none")
@@ -380,8 +380,8 @@ func TestStateMatrix(t *testing.T) {
 		if err != nil {
 			t.Fatalf("State: %v", err)
 		}
-		if s.HookEvents != 3 {
-			t.Errorf("expected 3 hook events, got %d", s.HookEvents)
+		if s.HookEvents != 5 {
+			t.Errorf("expected 5 hook events, got %d", s.HookEvents)
 		}
 		if s.MCPRegistered {
 			t.Errorf("expected mcp not registered")

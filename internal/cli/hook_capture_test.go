@@ -724,7 +724,7 @@ func TestCheckpointFiresOnToolThreshold(t *testing.T) {
 			}
 			// Third crosses the threshold: the checkpoint prompt is injected.
 			env := hookWith(t, "tool-use", tc.name, fill(tc.tool))
-			if got := extractReason(t, env); got != checkpointReason {
+			if got := extractPack(t, env); got != checkpointReason {
 				t.Errorf("%s threshold tool-use reason = %q, want the checkpoint prompt", tc.name, got)
 			}
 			// The next tool-use re-arms from zero: silent until threshold again.

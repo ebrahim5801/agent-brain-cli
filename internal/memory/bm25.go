@@ -3,6 +3,7 @@ package memory
 import (
 	"math"
 	"strings"
+	"unicode"
 )
 
 // Classic Okapi BM25 parameters.
@@ -22,7 +23,7 @@ type bm25Model struct {
 }
 
 func tokenize(s string) []string {
-	fields := strings.Fields(strings.ToLower(s))
+	fields := rawTokens(s)
 	out := make([]string, len(fields))
 	for i, w := range fields {
 		out[i] = stem(w)
@@ -31,7 +32,18 @@ func tokenize(s string) []string {
 }
 
 func rawTokens(s string) []string {
-	return strings.Fields(strings.ToLower(s))
+	fields := strings.Fields(strings.ToLower(s))
+	out := fields[:0]
+	for _, field := range fields {
+		// Prose and Markdown punctuation must not become part of a term.
+		// Keep interior punctuation so identifiers and paths remain searchable.
+		if term := strings.TrimFunc(field, func(r rune) bool {
+			return r == '`' || (unicode.IsPunct(r) && !strings.ContainsRune("_-/#", r))
+		}); term != "" {
+			out = append(out, term)
+		}
+	}
+	return out
 }
 
 func newBM25Model(docs [][]string) *bm25Model {
@@ -67,7 +79,10 @@ func (m *bm25Model) score(doc []string, terms []string) float64 {
 	for _, w := range doc {
 		tf[w]++
 	}
-	dl := float64(len(doc))
+	return m.scoreTF(tf, len(doc), terms)
+}
+func (m *bm25Model) scoreTF(tf map[string]int, length int, terms []string) float64 {
+	dl := float64(length)
 	var score float64
 	for _, term := range terms {
 		f := float64(tf[term])

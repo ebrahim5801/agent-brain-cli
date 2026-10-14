@@ -114,14 +114,14 @@ func TestParseHookModelUsageWhitelistOnly(t *testing.T) {
 	}
 }
 
-func TestInjectionResponseUnsupported(t *testing.T) {
-	if got := (Adapter{}).InjectionResponse("some pack"); got != "" {
-		t.Errorf("InjectionResponse = %q, want empty (unsupported)", got)
+func TestInjectionResponseHasScopedContext(t *testing.T) {
+	if got := (Adapter{}).InjectionResponse("some pack"); !strings.Contains(got, "additionalContext") {
+		t.Errorf("InjectionResponse = %q, context envelope missing", got)
 	}
 }
 
-func TestStopResponseUnsupported(t *testing.T) {
-	if got := (Adapter{}).StopResponse("distill now"); got != "" {
-		t.Errorf("StopResponse = %q, want empty (unsupported)", got)
+func TestStopResponseRequestsOneScopedContinuation(t *testing.T) {
+	if got := (Adapter{}).StopResponse("distill now"); !strings.Contains(got, "distill now") {
+		t.Errorf("StopResponse = %q, continuation reason missing", got)
 	}
 }
