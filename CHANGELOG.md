@@ -1,10 +1,13 @@
 # Changelog
 
-## 0.1.0 - 2026-10-13
+## 0.4.0 - 2026-10-14
 
-First public release of the agent-brain CLI. The client was previously
-developed in a private monorepo alongside the hosted backend; this repository
-contains the client only, extracted with its full functionality intact.
+First release of the agent-brain CLI from this repository, and the first with
+public prebuilt binaries. The client was previously developed in a private
+monorepo alongside the hosted backend; this repository contains the client
+only, extracted with its full functionality intact. The update server already
+offered 0.3.0, so this release is numbered above it: a lower number would make
+every install replace itself with 0.3.0 at its next update check.
 
 ### Added
 

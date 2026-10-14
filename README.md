@@ -27,7 +27,7 @@ irm https://agentbrain.wecansync.com/install.ps1 | iex
 The installer downloads the binary for your OS and CPU (Linux, macOS, or
 Windows on amd64/arm64), checks it against the release's `checksums.txt`,
 installs it, and offers to run `agent-brain install` for your assistants. Set
-`AGENT_BRAIN_VERSION=0.1.0` to pin a version, `AGENT_BRAIN_BIN_DIR=DIR` to
+`AGENT_BRAIN_VERSION=0.4.0` to pin a version, `AGENT_BRAIN_BIN_DIR=DIR` to
 choose the folder, `AGENT_BRAIN_NO_INTEGRATE=1` to install the binary only, or
 `AGENT_BRAIN_YES=1` to integrate every detected assistant without asking. The
 full guide is at <https://agentbrain.wecansync.com/docs/>.
