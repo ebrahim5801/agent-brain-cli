@@ -180,6 +180,10 @@ func runHook(event, assistantName string) (stdout string) {
 			stdout = pr.PromptResponse()
 		}
 	case assistant.EventToolUse:
+		if input.FromSubagent {
+			appendEvent(st, logger, sessionID, "subagent_tool_use", input.ToolName, at)
+			break
+		}
 		if !strings.Contains(input.ToolName, "memory_") && !strings.Contains(input.ToolName, "session_summary") {
 			appendEvent(st, logger, sessionID, "tool_use", input.ToolName, at)
 		}

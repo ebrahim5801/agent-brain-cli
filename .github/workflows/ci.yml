@@ -11,6 +11,20 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: abtest
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: abtest
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U abtest -d abtest"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      AGENT_BRAIN_TEST_PG_DSN: postgres://abtest:test-only@127.0.0.1:5432/abtest?sslmode=disable
+      AGENT_BRAIN_REQUIRE_PG: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -20,6 +34,7 @@ jobs:
       - run: go build ./...
       - run: go vet ./...
       - run: go test ./...
+      - run: GORACE=atexit_sleep_ms=0 go test -race ./internal/assistant/... ./internal/cli ./internal/memory ./internal/mcpserver ./internal/store
 
   lint:
     runs-on: ubuntu-latest
