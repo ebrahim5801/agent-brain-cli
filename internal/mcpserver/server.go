@@ -18,6 +18,7 @@ import (
 	"github.com/ebrahim5801/agent-brain-cli/internal/diag"
 	"github.com/ebrahim5801/agent-brain-cli/internal/entitlement"
 	"github.com/ebrahim5801/agent-brain-cli/internal/memory"
+	"github.com/ebrahim5801/agent-brain-cli/internal/redact"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
 )
 
@@ -69,6 +70,10 @@ func New(st *store.Store, dir, version string) *Server {
 			"Stored on this machine only; never synced.",
 	}, s.sessionSummary)
 
+	s.addCaptureTools()
+	s.addHistoryTool()
+	s.addSourceTool()
+	s.addStatusTool()
 	return s
 }
 
@@ -95,16 +100,28 @@ func newLogger(st *store.Store) *diag.Logger {
 // tool call. sessionID == 0 (no session on record for this project yet) is
 // skipped rather than attempted, since memory_usage_events.session_id has no
 // valid target to reference.
-func (s *Server) recordRetrieval(sessionID, projectID int64, scope string, memoryID int64, teamUID string) {
+func (s *Server) recordRetrieval(sessionID, projectID int64, scope string, memoryID int64, teamUID string, revision int64) {
 	if sessionID == 0 {
 		return
 	}
-	if err := s.st.RecordRetrieval(sessionID, projectID, scope, memoryID, teamUID, store.Now()); err != nil {
+	if err := s.st.RecordRetrievalRevision(sessionID, projectID, scope, memoryID, teamUID, revision, store.Now()); err != nil {
 		s.logger.Log("memory", "record retrieval: %v", err)
 	}
 }
 
 type saveIn struct {
+	Relations        []store.NewRelation    `json:"relations,omitempty" jsonschema:"Typed local proposals: target_id plus contradicts, supports or derived_from. Never authoritative instructions."`
+	Evidence         []memory.EvidenceInput `json:"evidence,omitempty" jsonschema:"Structured source references checked locally against original user messages or bounded artifacts."`
+	Completes        []int64                `json:"completes,omitempty" jsonschema:"Task IDs this outcome completes; requires verified original user evidence."`
+	ExpectedRevision int64                  `json:"expected_revision,omitempty" jsonschema:"Effective revision returned by list/history for a lifecycle transition."`
+	OperationID      string                 `json:"operation_id,omitempty" jsonschema:"Stable durable retry ID; reuse it only for the identical logical save."`
+	BatchID          string                 `json:"batch_id,omitempty" jsonschema:"Capture batch ID returned by memory_capture_begin."`
+	Generation       int64                  `json:"generation,omitempty" jsonschema:"Current capture lease generation."`
+	Rationale        string                 `json:"rationale,omitempty" jsonschema:"Why the decision was made; unknown if unavailable."`
+	Subject          string                 `json:"subject_key,omitempty" jsonschema:"Stable decision or task subject within this project."`
+	Scope            string                 `json:"scope,omitempty" jsonschema:"Empty for project-wide or branch:name or checkout:absolute-path."`
+
+	SessionHandle  string   `json:"session_handle,omitempty" jsonschema:"Opaque session handle supplied by the local hook; omit if unavailable. Never guess from newest session."`
 	Content        string   `json:"content" jsonschema:"The fact/decision/convention/task state to remember, self-contained and concise. Max 4000 characters."`
 	Kind           string   `json:"kind" jsonschema:"One of: decision, convention, task_state, fact."`
 	Origin         string   `json:"origin" jsonschema:"explicit when the developer asked for this to be remembered, auto otherwise."`
@@ -121,8 +138,12 @@ func (s *Server) save(ctx context.Context, req *mcp.CallToolRequest, in saveIn) 
 	}
 	// Session attribution is provenance, best-effort like git state: a lookup
 	// failure leaves session_id NULL rather than losing the memory.
-	sessionID, _ := s.st.LatestSessionID(projectID)
+	sessionID, err := s.sessionID(in.SessionHandle, projectID)
+	if err != nil {
+		return nil, nil, err
+	}
 	res, err := memory.Save(s.st, memory.SaveInput{
+		Relations: in.Relations, Evidence: in.Evidence, Completes: in.Completes, ExpectedRevision: in.ExpectedRevision, SessionHandle: in.SessionHandle, OperationID: in.OperationID, BatchID: in.BatchID, Generation: in.Generation, Rationale: in.Rationale, Subject: in.Subject, Scope: in.Scope,
 		ProjectID:      projectID,
 		SessionID:      sessionID,
 		Dir:            s.dir,
@@ -140,6 +161,12 @@ func (s *Server) save(ctx context.Context, req *mcp.CallToolRequest, in saveIn) 
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "saved memory %d", res.ID)
+	for _, id := range res.Pending {
+		fmt.Fprintf(&b, "\nchange to %d pending: evidence or expected revision insufficient", id)
+	}
+	for _, id := range res.Completed {
+		fmt.Fprintf(&b, "\ncompleted task %d", id)
+	}
 	for _, id := range res.Superseded {
 		fmt.Fprintf(&b, "\nsuperseded %d", id)
 	}
@@ -152,21 +179,24 @@ func (s *Server) save(ctx context.Context, req *mcp.CallToolRequest, in saveIn) 
 	for h, reason := range res.RejectedTeam {
 		fmt.Fprintf(&b, "\nsupersedes_team team#%s rejected: %s", h, reason)
 	}
-	return textResult(b.String()), nil, nil
+	return textResult(b.String()), res, nil
 }
 
 type summaryIn struct {
-	Summary string `json:"summary" jsonschema:"2-3 sentences: the goal, what changed, the outcome. Max 500 characters."`
+	SessionHandle string `json:"session_handle,omitempty" jsonschema:"Hook-issued session handle; required for safe summary attribution."`
+	Summary       string `json:"summary" jsonschema:"2-3 sentences: the goal, what changed, the outcome. Max 500 characters."`
 }
 
-// sessionSummary annotates the newest session of this project. Unlike the
+// sessionSummary annotates exactly the bound session of this project. Unlike the
 // memory tools it is not entitlement-gated: the summary is a local telemetry
 // annotation, available to every collector install.
 func (s *Server) sessionSummary(ctx context.Context, req *mcp.CallToolRequest, in summaryIn) (*mcp.CallToolResult, any, error) {
 	if s.st == nil {
 		return nil, nil, gateErr("temporarily unavailable", "check `agent-brain status` and diagnostics")
 	}
-	summary := strings.TrimSpace(in.Summary)
+	// Redact before truncating: cutting a token first can hide its recognizable
+	// shape while still persisting part of the credential.
+	summary := strings.TrimSpace(redact.Apply(in.Summary))
 	if summary == "" {
 		return nil, nil, fmt.Errorf("summary must not be empty")
 	}
@@ -180,21 +210,23 @@ func (s *Server) sessionSummary(ctx context.Context, req *mcp.CallToolRequest, i
 	if err != nil {
 		return nil, nil, gateErr("temporarily unavailable", "check `agent-brain status` and diagnostics")
 	}
-	ok, err := s.st.SetSessionSummary(projectID, summary)
+	binding, err := s.st.ResolveBinding(in.SessionHandle, projectID, s.dir)
 	if err != nil {
-		return nil, nil, gateErr("temporarily unavailable", "check `agent-brain status` and diagnostics")
+		return nil, nil, fmt.Errorf("summary requires explicit session attribution: %w", err)
 	}
-	if !ok {
-		return nil, nil, fmt.Errorf("no session recorded for this project yet")
+	if err := s.st.SetBoundSummary(binding, summary); err != nil {
+		return nil, nil, err
 	}
 	return textResult("session summary saved"), nil, nil
 }
 
 type searchIn struct {
-	Query    string `json:"query,omitempty" jsonschema:"Keywords to match; empty returns most recent."`
-	Kind     string `json:"kind,omitempty" jsonschema:"Narrow to one kind: decision, convention, task_state, or fact."`
-	Priority string `json:"priority,omitempty" jsonschema:"Narrow to one priority: critical, normal, or background."`
-	Limit    int    `json:"limit,omitempty" jsonschema:"Maximum entries to return, 1-50; default 10."`
+	Explain       bool   `json:"explain,omitempty" jsonschema:"Include ranking score components in the structured result for local diagnostics; no private query is logged."`
+	SessionHandle string `json:"session_handle,omitempty" jsonschema:"Hook-issued session handle for attribution; omit for unbound retrieval."`
+	Query         string `json:"query,omitempty" jsonschema:"Keywords to match; empty returns most recent."`
+	Kind          string `json:"kind,omitempty" jsonschema:"Narrow to one kind: decision, convention, task_state, or fact."`
+	Priority      string `json:"priority,omitempty" jsonschema:"Narrow to one priority: critical, normal, or background."`
+	Limit         int    `json:"limit,omitempty" jsonschema:"Maximum entries to return, 1-50; default 10."`
 }
 
 func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in searchIn) (*mcp.CallToolResult, any, error) {
@@ -204,7 +236,10 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in search
 	}
 	// Best-effort attribution, like save(): a search that predates any recorded
 	// session (sessionID 0) simply skips retrieval capture below.
-	sessionID, _ := s.st.LatestSessionID(projectID)
+	sessionID, err := s.sessionID(in.SessionHandle, projectID)
+	if err != nil {
+		return nil, nil, err
+	}
 	limit := in.Limit
 	if limit <= 0 {
 		limit = 10
@@ -218,34 +253,31 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in search
 	}
 	filter := memory.Filter{Kind: in.Kind, Priority: in.Priority}
 	now := time.Now()
-	ranked, err := memory.Search(s.st, projectID, s.dir, in.Query, filter, limit, gitBudget, now)
+	results, err := memory.SearchMerged(s.st, projectID, s.dir, in.Query, filter, limit, gitBudget, now)
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, r := range ranked {
-		s.recordRetrieval(sessionID, projectID, "personal", r.Entry.ID, "")
-	}
-	// The limit bounds the whole result: personal matches rank first (they are
-	// the reader's own context), team matches fill what remains.
-	var teamLines []string
-	if remaining := limit - len(ranked); remaining > 0 {
-		var teamUIDs []string
-		teamLines, teamUIDs, err = memory.TeamSearch(s.st, projectID, s.dir, in.Query, filter, remaining, gitBudget, now)
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, uid := range teamUIDs {
-			s.recordRetrieval(sessionID, projectID, "team", 0, uid)
-		}
-	}
-	if len(ranked) == 0 && len(teamLines) == 0 {
+	if len(results) == 0 {
 		return textResult("no matching memories"), nil, nil
 	}
-	return textResult(mergeRendered(renderEntries(ranked, false), teamLines)), nil, nil
+	var lines []string
+	for _, r := range results {
+		lines = append(lines, r.Text)
+		if r.TeamUID != "" {
+			s.recordRetrieval(sessionID, projectID, "team", 0, r.TeamUID, 0)
+		} else {
+			s.recordRetrieval(sessionID, projectID, "personal", r.PersonalID, "", r.Revision)
+		}
+	}
+	if in.Explain {
+		return textResult(strings.Join(lines, "\n")), map[string]any{"results": results}, nil
+	}
+	return textResult(strings.Join(lines, "\n")), nil, nil
 }
 
 type listIn struct {
-	IncludeSuperseded bool `json:"include_superseded,omitempty" jsonschema:"Also list superseded entries, marked with what replaced them."`
+	SessionHandle     string `json:"session_handle,omitempty" jsonschema:"Hook-issued session handle for attribution."`
+	IncludeSuperseded bool   `json:"include_superseded,omitempty" jsonschema:"Also list superseded entries, marked with what replaced them."`
 }
 
 func (s *Server) list(ctx context.Context, req *mcp.CallToolRequest, in listIn) (*mcp.CallToolResult, any, error) {
@@ -303,6 +335,9 @@ func (s *Server) gate() (projectID int64, link config.Link, err error) {
 	if s.st == nil {
 		return 0, config.Link{}, gateErr("temporarily unavailable", "check `agent-brain status` and diagnostics")
 	}
+	if err := s.st.AssertMemoryCapability(); err != nil {
+		return 0, config.Link{}, err
+	}
 	cfg, err := config.Load()
 	if err != nil {
 		return 0, config.Link{}, gateErr("temporarily unavailable", "check `agent-brain status` and diagnostics")
@@ -356,4 +391,14 @@ func remedy(reason string) string {
 
 func textResult(text string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}
+}
+
+// sessionID intentionally never uses project recency. Missing identity is honest
+// unbound provenance; an invalid supplied handle is an error, not a fallback.
+func (s *Server) sessionID(handle string, projectID int64) (int64, error) {
+	if handle == "" {
+		return 0, nil
+	}
+	b, err := s.st.ResolveBinding(handle, projectID, s.dir)
+	return b.SessionID, err
 }

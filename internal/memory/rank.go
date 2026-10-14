@@ -2,6 +2,7 @@ package memory
 
 import (
 	"math"
+	"sort"
 	"time"
 
 	"github.com/ebrahim5801/agent-brain-cli/internal/gitstate"
@@ -99,13 +100,7 @@ func Rank(entries []store.Memory, cmp *gitstate.Comparer, now time.Time) []Ranke
 }
 
 func sortRanked(r []Ranked) {
-	// Insertion sort keeps this dependency-free and stable enough for the
-	// small N here; slices.SortFunc would be equivalent.
-	for i := 1; i < len(r); i++ {
-		for j := i; j > 0 && rankedLess(r[j], r[j-1]); j-- {
-			r[j], r[j-1] = r[j-1], r[j]
-		}
-	}
+	sort.SliceStable(r, func(i, j int) bool { return rankedLess(r[i], r[j]) })
 }
 
 func rankedLess(a, b Ranked) bool {

@@ -44,8 +44,8 @@ func TestReopenAppliesForwardMigrationsAndKeepsData(t *testing.T) {
 	if err := st2.DB.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil {
 		t.Fatal(err)
 	}
-	if version != len(migrations) {
-		t.Errorf("schema version = %d, want %d", version, len(migrations))
+	if version != 15 {
+		t.Errorf("schema version = %d, want %d", version, 15)
 	}
 	var identity string
 	if err := st2.DB.QueryRow(`SELECT identity FROM projects WHERE id = ?`, projectID).Scan(&identity); err != nil {

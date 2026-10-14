@@ -29,8 +29,9 @@ const (
 )
 
 type Store struct {
-	DB      *sql.DB
-	Backend Backend
+	MemoryV2 bool // approved additive schema exists; never inferred from configuration
+	DB       *sql.DB
+	Backend  Backend
 	// Path is the SQLite file path, or the redacted DSN for display on Postgres.
 	Path string
 }
@@ -69,10 +70,20 @@ func Open() (*Store, error) {
 }
 
 func OpenAt(path string) (*Store, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
-	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)", path)
+	// Create new stores privately, including the WAL's inherited mode. Leave
+	// permissions of an existing user-managed database unchanged.
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
+	if err == nil {
+		if err := f.Close(); err != nil {
+			return nil, err
+		}
+	} else if !os.IsExist(err) {
+		return nil, err
+	}
+	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(FULL)&_pragma=foreign_keys(1)&_txlock=immediate", path)
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
@@ -84,6 +95,12 @@ func OpenAt(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	v, err := s.SchemaVersion()
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	s.MemoryV2 = v >= 16
 	return s, nil
 }
 

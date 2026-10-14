@@ -64,6 +64,7 @@ func (s *Store) EnsureSession(externalID string, projectID int64, startedAt, tra
             ended_at   = CASE WHEN sessions.end_reason = 'interrupted' THEN NULL ELSE sessions.ended_at END,
             end_reason = CASE WHEN sessions.end_reason = 'interrupted' THEN NULL ELSE sessions.end_reason END,
             sync_dirty = CASE WHEN sessions.end_reason = 'interrupted' THEN 1 ELSE sessions.sync_dirty END
+ WHERE sessions.project_id=excluded.project_id AND sessions.assistant=excluded.assistant
         RETURNING id`,
 		externalID, projectID, startedAt, transcriptPath, assistant, newSyncUID()).Scan(&id)
 	return id, err

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/ebrahim5801/agent-brain-cli/internal/gitstate"
 	"github.com/ebrahim5801/agent-brain-cli/internal/redact"
@@ -44,12 +45,23 @@ var (
 )
 
 type SaveInput struct {
-	ProjectID int64
-	SessionID int64 // 0 when outside a tracked session
-	Dir       string
-	Content   string
-	Kind      string
-	Origin    string
+	Relations        []store.NewRelation
+	Evidence         []EvidenceInput
+	Completes        []int64
+	ExpectedRevision int64
+	ProjectID        int64
+	SessionID        int64 // 0 when outside a tracked session
+	SessionHandle    string
+	OperationID      string
+	BatchID          string
+	Generation       int64
+	Rationale        string
+	Subject          string
+	Scope            string
+	Dir              string
+	Content          string
+	Kind             string
+	Origin           string
 	// Priority governs how hard the entry competes for the session-start pack
 	// budget. Empty normalizes to "normal" so a caller that does not classify
 	// is never forced to; an unrecognized value is ErrBadPriority.
@@ -68,15 +80,16 @@ type SaveInput struct {
 }
 
 type SaveResult struct {
-	ID         int64
-	Superseded []int64
-	// Rejected maps supersede IDs that were refused to the reason.
-	Rejected map[int64]string
-	// SupersededTeam holds the team handles accepted for cross-author/same-author
-	// retirement (queued for contribution); RejectedTeam maps a refused handle to
-	// the reason (unknown, ambiguous, or not shareable).
-	SupersededTeam []string
-	RejectedTeam   map[string]string
+	ID             int64             `json:"memory_id"`
+	OperationID    string            `json:"operation_id,omitempty"`
+	Outcome        string            `json:"outcome,omitempty"`
+	Attribution    string            `json:"attribution"`
+	Superseded     []int64           `json:"superseded,omitempty"`
+	Completed      []int64           `json:"completed,omitempty"`
+	Pending        []int64           `json:"pending,omitempty"`
+	Rejected       map[int64]string  `json:"rejected,omitempty"`
+	SupersededTeam []string          `json:"superseded_team,omitempty"`
+	RejectedTeam   map[string]string `json:"rejected_team,omitempty"`
 }
 
 // Save validates, redacts, records capture-time git state, inserts the entry,
@@ -97,45 +110,23 @@ func Save(st *store.Store, in SaveInput) (SaveResult, error) {
 	if content == "" {
 		return SaveResult{}, ErrEmptyContent
 	}
-	if len(content) > MaxContentLen {
+	if utf8.RuneCountInString(content) > MaxContentLen {
 		return SaveResult{}, ErrContentTooLong
 	}
 
-	gs := gitstate.Capture(in.Dir)
-	at := store.Now()
-	id, err := st.InsertMemory(store.NewMemory{
-		ProjectID:    in.ProjectID,
-		SessionID:    in.SessionID,
-		Content:      content,
-		Kind:         in.Kind,
-		Origin:       in.Origin,
-		Priority:     priority,
-		Branch:       gs.Branch,
-		Commit:       gs.Commit,
-		HasRepo:      gs.HasRepo,
-		PersonalOnly: in.PersonalOnly,
-		ShareLive:    in.ShareLive,
-	}, at)
-	if err != nil {
+	if err := st.AssertMemoryCapability(); err != nil {
 		return SaveResult{}, err
 	}
-
-	res := SaveResult{ID: id, Rejected: map[int64]string{}, RejectedTeam: map[string]string{}}
-	for _, oldID := range in.Supersedes {
-		if oldID == id {
-			res.Rejected[oldID] = "cannot supersede itself"
-			continue
-		}
-		err := st.SupersedeMemory(oldID, id, in.ProjectID, at)
-		switch {
-		case err == nil:
-			res.Superseded = append(res.Superseded, oldID)
-		case errors.Is(err, store.ErrMemoryNotFound):
-			res.Rejected[oldID] = "not an active entry of this project"
-		default:
-			return res, err
-		}
+	if st.MemoryV2 {
+		return saveV2(st, in, content, priority)
 	}
+	// A legacy-format save remains usable, but new contracts must never be
+	// silently discarded or falsely acknowledged without their side tables.
+	if in.OperationID != "" || in.BatchID != "" || in.SessionHandle != "" || in.Rationale != "" || in.Subject != "" || in.Scope != "" || len(in.Evidence) > 0 || len(in.Completes) > 0 || len(in.Relations) > 0 || in.ExpectedRevision != 0 {
+		return SaveResult{}, store.ErrV2Required
+	}
+	res := SaveResult{RejectedTeam: map[string]string{}}
+	var teamUIDs []string
 	for _, raw := range in.SupersedesTeam {
 		handle := normalizeTeamHandle(raw)
 		if handle == "" {
@@ -150,9 +141,7 @@ func Save(st *store.Store, in SaveInput) (SaveResult, error) {
 		uid, err := st.ResolveTeamHandle(in.ProjectID, handle)
 		switch {
 		case err == nil:
-			if err := st.AddTeamSupersede(id, uid); err != nil {
-				return res, err
-			}
+			teamUIDs = append(teamUIDs, uid)
 			res.SupersededTeam = append(res.SupersededTeam, handle)
 		case errors.Is(err, store.ErrMemoryNotFound):
 			res.RejectedTeam[handle] = "no active team entry with this handle"
@@ -161,6 +150,33 @@ func Save(st *store.Store, in SaveInput) (SaveResult, error) {
 		default:
 			return res, err
 		}
+	}
+	gs := gitstate.Capture(in.Dir)
+	var err error
+	res.ID, res.Superseded, res.Rejected, err = st.InsertMemorySuperseding(store.NewMemory{
+		ProjectID: in.ProjectID, SessionID: in.SessionID, Content: content,
+		Kind: in.Kind, Origin: in.Origin, Priority: priority,
+		Branch: gs.Branch, Commit: gs.Commit, HasRepo: gs.HasRepo,
+		PersonalOnly: in.PersonalOnly, ShareLive: in.ShareLive,
+	}, nil, teamUIDs, store.Now())
+	if err != nil {
+		return SaveResult{}, err
+	}
+	for _, id := range in.Supersedes {
+		old, err := st.GetMemory(id)
+		if errors.Is(err, store.ErrMemoryNotFound) || old.ProjectID != in.ProjectID || old.Status != store.MemoryActive {
+			res.Rejected[id] = "not an active entry of this project"
+			continue
+		}
+		if err != nil {
+			return SaveResult{}, err
+		}
+		res.Pending = append(res.Pending, id)
+	}
+	res.Outcome = "persisted"
+	res.Attribution = "unbound"
+	if in.SessionID != 0 {
+		res.Attribution = "explicit_session_id"
 	}
 	return res, nil
 }
@@ -199,7 +215,7 @@ func Edit(st *store.Store, id int64, content string) error {
 	if content == "" {
 		return ErrEmptyContent
 	}
-	if len(content) > MaxContentLen {
+	if utf8.RuneCountInString(content) > MaxContentLen {
 		return ErrContentTooLong
 	}
 	return st.UpdateMemoryContent(id, content, store.Now())

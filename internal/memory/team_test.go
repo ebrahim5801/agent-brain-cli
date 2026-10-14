@@ -113,7 +113,7 @@ func TestBuildPackServesTeamOnly(t *testing.T) {
 	if !strings.Contains(pack.Text, "## Project memory (agent-brain)") {
 		t.Error("header missing")
 	}
-	if !strings.Contains(pack.Text, "team · alice@example.com") {
+	if !strings.Contains(pack.Text, "team · \"alice@example.com\"") {
 		t.Errorf("team attribution missing in:\n%s", pack.Text)
 	}
 	if !strings.Contains(pack.Text, "retries use backoff") {
@@ -136,7 +136,7 @@ func TestBuildPackMergesPersonalAndTeam(t *testing.T) {
 	if !strings.Contains(pack.Text, "my local decision") || !strings.Contains(pack.Text, "team decision") {
 		t.Errorf("merged pack missing an entry:\n%s", pack.Text)
 	}
-	if !strings.Contains(pack.Text, "[#") || !strings.Contains(pack.Text, "team · bob@example.com") {
+	if !strings.Contains(pack.Text, "[#") || !strings.Contains(pack.Text, "team · \"bob@example.com\"") {
 		t.Errorf("both renderings should appear:\n%s", pack.Text)
 	}
 }

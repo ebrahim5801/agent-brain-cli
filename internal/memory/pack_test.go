@@ -42,7 +42,7 @@ func TestBuildPackFormatAndHeader(t *testing.T) {
 			t.Errorf("pack missing %q", must)
 		}
 	}
-	wantLine := "[#" + strconv.FormatInt(res.ID, 10) + "] (decision, explicit, unknown: no git state) use pgx directly"
+	wantLine := "[#" + strconv.FormatInt(res.ID, 10) + "] (decision, explicit, git: unknown: no git state; verification: unverified; scope: unknown (legacy)) \"use pgx directly\""
 	if !strings.Contains(pack.Text, wantLine) {
 		t.Errorf("pack missing entry line %q in:\n%s", wantLine, pack.Text)
 	}
@@ -71,19 +71,19 @@ func TestBuildPackRespectsBudget(t *testing.T) {
 	}
 }
 
-func TestBuildPackServesOneOversizedEntry(t *testing.T) {
+func TestBuildPackBoundsOneOversizedEntry(t *testing.T) {
 	st, projectID := openStore(t)
 	dir := t.TempDir()
 	if _, err := Save(st, SaveInput{ProjectID: projectID, Dir: dir, Content: strings.Repeat("y", 3000), Kind: "fact", Origin: OriginAuto}); err != nil {
 		t.Fatal(err)
 	}
-	// Budget smaller than header+entry: still serve the single entry.
+	// A bounded excerpt retains identity/labels and never overflows the budget.
 	pack, err := BuildPack(st, projectID, dir, 100, 0, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(pack.Text, "[#") != 1 {
-		t.Errorf("oversized single entry not served:\n%s", pack.Text)
+	if strings.Count(pack.Text, "[#") != 1 || len(pack.Text) > 400 {
+		t.Errorf("oversized single entry not bounded:\n%s", pack.Text)
 	}
 }
 
@@ -206,7 +206,12 @@ func TestBuildPackExcludesSuperseded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Save(st, SaveInput{ProjectID: projectID, Dir: dir, Content: "new truth", Kind: "decision", Origin: OriginAuto, Supersedes: []int64{first.ID}}); err != nil {
+	replacement, err := Save(st, SaveInput{ProjectID: projectID, Dir: dir, Content: "new truth", Kind: "decision", Origin: OriginAuto})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Seed a pre-V2 historical chain explicitly; automatic saves require evidence.
+	if err := st.SupersedeMemory(first.ID, replacement.ID, projectID, store.Now()); err != nil {
 		t.Fatal(err)
 	}
 	pack, err := BuildPack(st, projectID, dir, 0, 0, time.Now())
@@ -246,9 +251,9 @@ func TestPackRendersPriorityOnlyWhenNotNormal(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"[#" + strconv.FormatInt(crit.ID, 10) + "] (task_state, auto, critical, unknown: no git state)",
-		"[#" + strconv.FormatInt(bg.ID, 10) + "] (fact, auto, background, unknown: no git state)",
-		"[#" + strconv.FormatInt(norm.ID, 10) + "] (fact, auto, unknown: no git state)",
+		"[#" + strconv.FormatInt(crit.ID, 10) + "] (task_state, auto, critical, git: unknown: no git state; verification: unverified; scope: unknown (legacy))",
+		"[#" + strconv.FormatInt(bg.ID, 10) + "] (fact, auto, background, git: unknown: no git state; verification: unverified; scope: unknown (legacy))",
+		"[#" + strconv.FormatInt(norm.ID, 10) + "] (fact, auto, git: unknown: no git state; verification: unverified; scope: unknown (legacy))",
 	} {
 		if !strings.Contains(pack.Text, want) {
 			t.Errorf("pack missing %q in:\n%s", want, pack.Text)

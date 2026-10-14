@@ -15,6 +15,12 @@ import (
 func TestTransferSQLiteToPostgres(t *testing.T) {
 	dst := storetest.Postgres(t) // skips when the DSN is unset
 	src := storetest.SQLite(t)
+	if err := src.UpgradeMemoryV2(); err != nil {
+		t.Fatal(err)
+	}
+	if err := dst.UpgradeMemoryV2(); err != nil {
+		t.Fatal(err)
+	}
 
 	seed := seedAllTables(t, src)
 
@@ -172,6 +178,28 @@ func seedAllTables(t *testing.T, st *store.Store) seededIDs {
 		t.Fatalf("seed memory usage event: %v", err)
 	}
 
+	if st.MemoryV2 {
+		b, err := st.EnsureBoundSession(pid, "codex", "seed-v2", "/seed", "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		statements := []struct {
+			q    string
+			args []any
+		}{
+			{`INSERT INTO memory_capture_batches(id,project_id,source_handle,trigger,watermark,state,created_at,updated_at) VALUES('seed-batch',?,?,'stop',1,'pending',?,?)`, []any{pid, b.Handle, store.Now(), store.Now()}},
+			{`INSERT INTO memory_details(memory_id,project_id,format_version,rationale,subject_key,scope,content_digest,completeness) VALUES(?,?,2,'reason','subject','','digest','complete')`, []any{successor, pid}},
+			{`INSERT INTO memory_evidence(id,project_id,memory_id,source_type,locator,digest,excerpt,status,observed_at) VALUES('seed-evidence',?,?,'artifact','test','digest','','unverified',?)`, []any{pid, successor, store.Now()}},
+			{`INSERT INTO memory_relations(id,project_id,source_id,target_id,relation_type,scope,rationale,proposer,created_at) VALUES('seed-relation',?,?,?,'supports','','reason','test',?)`, []any{pid, successor, superseded, store.Now()}},
+			{`INSERT INTO memory_state_events(project_id,memory_id,relation_id,event_kind,expected_revision,actor,occurred_at,operation_id) VALUES(?,?,'seed-relation','accepted',0,'test',?,'seed-event')`, []any{pid, successor, store.Now()}},
+			{`INSERT INTO memory_write_receipts(project_id,operation_id,batch_id,item_key,state,memory_id,created_at) VALUES(?,'seed-operation','seed-batch','item','persisted',?,?)`, []any{pid, successor, store.Now()}},
+		}
+		for _, x := range statements {
+			if _, err := st.Exec(x.q, x.args...); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
 	return seededIDs{projectID: pid, sessionID: sid, supersededID: superseded, successorID: successor}
 }
 

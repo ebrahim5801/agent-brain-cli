@@ -204,6 +204,14 @@ func promptInjection(st *store.Store, logger *diag.Logger, sessionID, projectID 
 		logger.Log("memory", "load config: %v", err)
 		return memory.Pack{}
 	}
+	if st.MemoryV2 {
+		pack, err := memory.BuildRevisionRefresh(st, projectID, sessionID, cwd, cfg.MemoryPackBudgetTokens, injectionGitBudget, time.Now())
+		if err != nil {
+			logger.Log("memory", "revision refresh unavailable: %v", err)
+			return memory.Pack{}
+		}
+		return pack
+	}
 	seenPersonal, seenTeam := retrievedSets(st, logger, sessionID)
 	// The walk excludes what was already served, so without a session-wide
 	// ceiling a long session would march down the ranking and eventually inject
@@ -276,7 +284,7 @@ func recordPackRetrieval(st *store.Store, logger *diag.Logger, sessionID, projec
 	}
 	at := store.Now()
 	for _, id := range pack.PersonalIDs {
-		if err := st.RecordRetrieval(sessionID, projectID, "personal", id, "", at); err != nil {
+		if err := st.RecordRetrievalRevision(sessionID, projectID, "personal", id, "", pack.PersonalRevisions[id], at); err != nil {
 			logger.Log("memory", "record retrieval: %v", err)
 		}
 	}
@@ -319,6 +327,13 @@ func injectionNotice(p memory.Pack) string {
 // prompt so the post-distillation Stop always passes through; the gate re-arms
 // only when a new prompt arrived after the last distillation.
 func stopDistillation(st *store.Store, logger *diag.Logger, sessionID, projectID int64) string {
+	if st.MemoryV2 {
+		every, _ := captureThresholds(logger)
+		if every <= 0 || !memoryHookActive(st, logger, projectID) {
+			return ""
+		}
+		return v2CaptureReason(st, logger, sessionID, projectID, "stop", every)
+	}
 	if !memoryHookActive(st, logger, projectID) {
 		return ""
 	}
@@ -418,10 +433,14 @@ func recordCitations(st *store.Store, logger *diag.Logger, adapter assistant.Ada
 // the adapter's mid-turn envelope), or "" for silent pass-through. Any failure
 // reads as pass-through — a checkpoint must never disturb the session (FR-011).
 func checkpointCapture(st *store.Store, logger *diag.Logger, sessionID, projectID int64, threshold int) string {
-	// A threshold of 0 (configured off) never claims; without this guard the
-	// ">= 0" count would fire on every tool call.
 	if threshold <= 0 {
 		return ""
+	}
+	if st.MemoryV2 {
+		if !memoryHookActive(st, logger, projectID) {
+			return ""
+		}
+		return v2CaptureReason(st, logger, sessionID, projectID, "checkpoint", threshold)
 	}
 	if !memoryHookActive(st, logger, projectID) {
 		return ""

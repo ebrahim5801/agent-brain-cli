@@ -62,6 +62,18 @@ func TestSearchKeywordsAndKind(t *testing.T) {
 	}
 }
 
+func TestSearchMatchesPunctuationBoundaries(t *testing.T) {
+	st, pid := openStore(t)
+	dir := t.TempDir()
+	id := seed(t, st, pid, dir, "Use `PostgreSQL`, with (transactions).", "decision")
+	for _, query := range []string{"postgres", "PostgreSQL,", "transactions"} {
+		got, err := Search(st, pid, dir, query, Filter{}, 10, 0, time.Now())
+		if err != nil || len(got) != 1 || got[0].Entry.ID != id {
+			t.Errorf("query %q missed punctuation-wrapped terms: %d results, %v", query, len(got), err)
+		}
+	}
+}
+
 // End-to-end BM25 check: inflating "common"'s document frequency lowers its
 // IDF, so a query mixing it with the rarer "rare" should rank the
 // rare-term entry first even though both entries otherwise look alike.
@@ -167,10 +179,15 @@ func TestListIncludesSupersededOnRequest(t *testing.T) {
 	st, projectID := openStore(t)
 	dir := t.TempDir()
 	oldID := seed(t, st, projectID, dir, "old", "fact")
-	if _, err := Save(st, SaveInput{ProjectID: projectID, Dir: dir, Content: "new", Kind: "fact", Origin: OriginAuto, Supersedes: []int64{oldID}}); err != nil {
+	replacement, err := Save(st, SaveInput{ProjectID: projectID, Dir: dir, Content: "new", Kind: "fact", Origin: OriginAuto})
+	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Explicit historical fixture exercises legacy chains; automatic V2 writes use overlays.
+	if err := st.SupersedeMemory(oldID, replacement.ID, projectID, store.Now()); err != nil {
+		t.Fatal(err)
+	}
 	active, err := List(st, projectID, dir, false, 0)
 	if err != nil {
 		t.Fatal(err)

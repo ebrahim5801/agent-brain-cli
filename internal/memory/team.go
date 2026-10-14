@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ebrahim5801/agent-brain-cli/internal/gitstate"
+	"github.com/ebrahim5801/agent-brain-cli/internal/redact"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
 )
 
@@ -27,7 +28,8 @@ type packItem struct {
 	authorFormer bool
 	contradicts  bool
 	uid          string // team_uid; "" for personal entries
-	id           int64  // personal id; 0 for team entries
+	entry        store.Memory
+	id           int64 // personal id; 0 for team entries
 
 	freshness gitstate.Freshness
 	score     float64
@@ -53,8 +55,8 @@ func personalItem(e store.Memory, cmp *gitstate.Comparer, now time.Time) packIte
 	f := cmp.Compare(e.Branch.String, e.CommitHash.String)
 	return packItem{
 		content: e.Content, kind: e.Kind, origin: e.Origin, priority: e.Priority, capturedAt: e.CapturedAt,
-		branch: e.Branch.String, commit: e.CommitHash.String, id: e.ID,
-		freshness: f, score: entryScore(e.Priority, e.Origin, f.Signal, e.CapturedAt, now),
+		branch: e.Branch.String, commit: e.CommitHash.String, id: e.ID, entry: e,
+		freshness: f, score: contextScore(e, f.Signal, now),
 	}
 }
 
@@ -64,7 +66,7 @@ func teamItem(e store.TeamMemoryRow, cmp *gitstate.Comparer, now time.Time) pack
 		content: e.Content, kind: e.Kind, origin: e.Origin, priority: e.Priority, capturedAt: e.CapturedAt,
 		branch: e.Branch, commit: e.CommitHash,
 		isTeam: true, author: e.Author, authorFormer: e.AuthorFormer, contradicts: e.Contradicts != "", uid: e.UID,
-		freshness: f, score: entryScore(e.Priority, e.Origin, f.Signal, e.CapturedAt, now),
+		freshness: f, score: contextScore(store.Memory{Kind: e.Kind, Priority: e.Priority, Origin: e.Origin, CapturedAt: e.CapturedAt}, f.Signal, now),
 	}
 }
 
@@ -162,21 +164,21 @@ func teamLines(st *store.Store, projectID int64, dir, query string, filter Filte
 // attribution and state.
 func renderItem(it packItem) string {
 	if !it.isTeam {
-		return renderPersonalLine(it.id, it.kind, it.origin, it.priority, it.freshness.Render(), it.content)
+		return RenderEntry(Ranked{Entry: it.entry, Freshness: it.freshness, Score: it.score})
 	}
 	var meta strings.Builder
 	meta.WriteString("team · ")
-	meta.WriteString(it.author)
+	meta.WriteString(quoteData(redact.Apply(it.author)))
 	if it.authorFormer {
 		meta.WriteString(" (former member)")
 	}
 	meta.WriteString(" · ")
 	if tag := priorityTag(it.priority); tag != "" {
-		meta.WriteString(tag + " · ")
+		meta.WriteString(safeLabel(tag) + " · ")
 	}
-	meta.WriteString(it.freshness.Render())
+	meta.WriteString("git: " + safeLabel(it.freshness.Render()) + "; verification: unverified")
 	if it.contradicts {
 		meta.WriteString(" · CONTRADICTS another team entry")
 	}
-	return fmt.Sprintf("- [team#%s] (%s, %s) %s", TeamHandle(it.uid), it.kind, meta.String(), it.content)
+	return fmt.Sprintf("- [team#%s] (%s, %s) %s", safeLabel(TeamHandle(it.uid)), safeLabel(it.kind), meta.String(), quoteData(redact.Apply(it.content)))
 }
