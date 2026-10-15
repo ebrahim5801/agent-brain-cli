@@ -312,6 +312,13 @@ func (s *Server) list(ctx context.Context, req *mcp.CallToolRequest, in listIn) 
 	if err != nil {
 		return nil, nil, err
 	}
+	teamLines, err := memory.TeamList(s.st, projectID, s.dir, gitBudget, time.Now())
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(ranked) == 0 && len(teamLines) == 0 {
+		return textResult("no memories for this project"), nil, nil
+	}
 	filter := memory.Filter{Priority: in.Priority, Kind: in.Kind}
 	if in.Priority != "" || in.Kind != "" {
 		filtered := make([]memory.Ranked, 0, len(ranked))
@@ -321,18 +328,8 @@ func (s *Server) list(ctx context.Context, req *mcp.CallToolRequest, in listIn) 
 			}
 		}
 		ranked = filtered
-	}
-	var teamLines []string
-	if in.Priority == "" && in.Kind == "" {
-		teamLines, err = memory.TeamList(s.st, projectID, s.dir, gitBudget, time.Now())
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	// An unfiltered empty project keeps its established response. If filters
-	// exclude all entries, the empty result below reports the filtered total.
-	if in.Priority == "" && in.Kind == "" && len(ranked) == 0 && len(teamLines) == 0 {
-		return textResult("no memories for this project"), nil, nil
+		// Team lines do not share the personal metadata filter vocabulary.
+		teamLines = nil
 	}
 	lines := make([]string, 0, len(ranked)+len(teamLines))
 	for _, r := range ranked {

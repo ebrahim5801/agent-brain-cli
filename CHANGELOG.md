@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.3 - 2026-10-15
+
+### Fixed
+
+- `memory_list` with a `priority` or `kind` filter on a project that has no memories answers "no memories for this project", as an unfiltered list does, instead of "no memories on this page (total 0)".
+
 ## 0.5.2 - 2026-10-15
 
 ### Changed

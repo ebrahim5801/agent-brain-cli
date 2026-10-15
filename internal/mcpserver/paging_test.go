@@ -153,8 +153,8 @@ func TestMemoryListPriorityAndKindFilters(t *testing.T) {
 	if got := strings.Count(critical, "[#"); got != 4 {
 		t.Errorf("critical personal count = %d, want 4", got)
 	}
-	if strings.Contains(critical, "[team#") || !strings.Contains(critical, "personal-010") {
-		t.Errorf("priority filter included team rows or missed personal matches:\n%s", critical)
+	if strings.Contains(critical, "[team#") || !strings.Contains(critical, "personal-010") || strings.Contains(critical, "Showing ") {
+		t.Errorf("priority filter included team rows, missed personal matches, or added an unnecessary footer:\n%s", critical)
 	}
 	decisions := listText(t, s, listIn{Kind: "decision", Limit: 20})
 	if got := strings.Count(decisions, "[#"); got != 6 || strings.Contains(decisions, "[team#") {
