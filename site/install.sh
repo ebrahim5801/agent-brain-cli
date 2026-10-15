@@ -8,7 +8,7 @@
 # install` to integrate your coding assistants. No Go toolchain is needed.
 #
 # Environment:
-#   AGENT_BRAIN_VERSION=0.5.3     install this version instead of the latest
+#   AGENT_BRAIN_VERSION=0.5.4     install this version instead of the latest
 #   AGENT_BRAIN_BIN_DIR=DIR       install directory (default ~/.local/bin)
 #   AGENT_BRAIN_NO_INTEGRATE=1    install the binary only
 #   AGENT_BRAIN_YES=1             integrate every detected assistant without asking

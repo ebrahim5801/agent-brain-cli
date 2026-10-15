@@ -51,6 +51,7 @@ import (
 const (
 	projectName = "agent-brain"
 	versionVar  = "github.com/ebrahim5801/agent-brain-cli/internal/version.Version"
+	updateVar   = "github.com/ebrahim5801/agent-brain-cli/internal/config.DefaultUpdateURL"
 )
 
 // targets are the platforms the installers and the self-updater support.
@@ -69,16 +70,20 @@ func main() {
 	version := flag.String("version", "", "release version, for example 0.1.0 (required)")
 	out := flag.String("out", filepath.Join("dist", "site"), "output docroot; replaced if it holds an earlier build")
 	allowDirty := flag.Bool("allow-dirty", false, "build even if the git working tree has uncommitted changes")
+	updateURL := flag.String("update-url", "https://agentbrain.wecansync.com", "https site the binaries update from (the docroot this builds); empty updates from the cloud server")
 	flag.Parse()
-	if err := run(strings.TrimPrefix(*version, "v"), *out, *allowDirty); err != nil {
+	if err := run(strings.TrimPrefix(*version, "v"), *out, *allowDirty, *updateURL); err != nil {
 		fmt.Fprintln(os.Stderr, "release:", err)
 		os.Exit(1)
 	}
 }
 
-func run(version, out string, allowDirty bool) error {
+func run(version, out string, allowDirty bool, updateURL string) error {
 	if !versionRE.MatchString(version) {
 		return fmt.Errorf("-version must look like 0.1.0, got %q", version)
+	}
+	if updateURL != "" && (!strings.HasPrefix(updateURL, "https://") || strings.ContainsAny(updateURL, " '\"")) {
+		return fmt.Errorf("-update-url must be an https URL, got %q", updateURL)
 	}
 	for _, p := range append([]string{"go.mod", filepath.Join("cmd", projectName), "site"}, extraFiles...) {
 		if _, err := os.Stat(p); err != nil {
@@ -153,7 +158,7 @@ func run(version, out string, allowDirty bool) error {
 		}
 		binPath := filepath.Join(build, t.OS+"_"+t.Arch, bin)
 		fmt.Fprintf(os.Stderr, "building %s/%s\n", t.OS, t.Arch)
-		if err := goBuild(t.OS, t.Arch, version, binPath); err != nil {
+		if err := goBuild(t.OS, t.Arch, version, updateURL, binPath); err != nil {
 			return err
 		}
 		if t.OS == runtime.GOOS && t.Arch == runtime.GOARCH {
@@ -293,10 +298,14 @@ func copySite(src, dst string) error {
 	})
 }
 
-func goBuild(goos, goarch, version, output string) error {
+func goBuild(goos, goarch, version, updateURL, output string) error {
+	ldflags := "-s -w -X " + versionVar + "=" + version
+	if updateURL != "" {
+		ldflags += " -X " + updateVar + "=" + strings.TrimRight(updateURL, "/")
+	}
 	cmd := exec.Command("go", "build",
 		"-trimpath", "-buildvcs=false",
-		"-ldflags", "-s -w -X "+versionVar+"="+version,
+		"-ldflags", ldflags,
 		"-o", output, "./cmd/"+projectName)
 	cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH="+goarch, "CGO_ENABLED=0")
 	cmd.Stdout = os.Stderr

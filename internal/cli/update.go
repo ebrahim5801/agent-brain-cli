@@ -96,8 +96,9 @@ func runUpdate(ctx context.Context, checkOnly, force, quiet bool) error {
 		}
 	}
 
-	logf("Checking for updates (current version %s)...", current)
-	res, err := update.Check(ctx, &http.Client{Timeout: 15 * time.Second}, cfg.Server(), current)
+	src := updateSource(cfg)
+	logf("Checking %s for updates (current version %s)...", src.Base, current)
+	res, err := update.Check(ctx, &http.Client{Timeout: 15 * time.Second}, src, current)
 	if err != nil {
 		return fmt.Errorf("check for update: %w", err)
 	}
@@ -127,7 +128,7 @@ func runUpdate(ctx context.Context, checkOnly, force, quiet bool) error {
 	}
 
 	logf("Downloading agent-brain %s...", res.Latest)
-	target, err := update.Apply(ctx, &http.Client{Timeout: 5 * time.Minute}, cfg.Server(), res.Asset)
+	target, err := update.Apply(ctx, &http.Client{Timeout: 5 * time.Minute}, src, res)
 	if err != nil {
 		var manual *update.ErrManualInstall
 		if errors.As(err, &manual) {
@@ -175,4 +176,13 @@ func markAutoApplied(v string) {
 		c.Update.LastAutoApply = v
 		return nil
 	})
+}
+
+// updateSource is the release site this install updates from (a build or
+// AGENT_BRAIN_UPDATE_URL setting), or else the cloud server.
+func updateSource(cfg *config.Config) update.Source {
+	if site := cfg.UpdateURL(); site != "" {
+		return update.Source{Base: site, Static: true}
+	}
+	return update.Source{Base: cfg.Server()}
 }
