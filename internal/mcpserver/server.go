@@ -58,9 +58,8 @@ func New(st *store.Store, dir, version string) *Server {
 	}, s.search)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "memory_list",
-		Description: "List all memory entries for this project (active first, newest first). Use it to " +
-			"ground supersedes decisions before memory_save.",
+		Name:        "memory_list",
+		Description: "List this project's memory entries, active first, newest first: 50 per page by default (limit up to 200, offset for the next page; filter by priority or kind). Use it to ground supersedes decisions before memory_save.",
 	}, s.list)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -279,9 +278,32 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in search
 type listIn struct {
 	SessionHandle     string `json:"session_handle,omitempty" jsonschema:"Hook-issued session handle for attribution."`
 	IncludeSuperseded bool   `json:"include_superseded,omitempty" jsonschema:"Also list superseded entries, marked with what replaced them."`
+	Limit             int    `json:"limit,omitempty" jsonschema:"Maximum entries to return; default 50, maximum 200. Zero uses the default; negative values are errors."`
+	Offset            int    `json:"offset,omitempty" jsonschema:"Number of matching entries to skip; default 0, must be >= 0."`
+	Priority          string `json:"priority,omitempty" jsonschema:"Filter to one priority: critical, normal, or background."`
+	Kind              string `json:"kind,omitempty" jsonschema:"Filter to one kind: decision, convention, task_state, or fact."`
 }
 
 func (s *Server) list(ctx context.Context, req *mcp.CallToolRequest, in listIn) (*mcp.CallToolResult, any, error) {
+	if in.Limit < 0 {
+		return nil, nil, fmt.Errorf("limit must be >= 0")
+	}
+	if in.Offset < 0 {
+		return nil, nil, fmt.Errorf("offset must be >= 0")
+	}
+	if in.Priority != "" && !memory.ValidPriority(in.Priority) {
+		return nil, nil, fmt.Errorf("unknown priority %q; want one of: %s", in.Priority, strings.Join(memory.Priorities, ", "))
+	}
+	if in.Kind != "" && !memory.ValidKind(in.Kind) {
+		return nil, nil, fmt.Errorf("unknown kind %q; want one of: %s", in.Kind, strings.Join(memory.Kinds, ", "))
+	}
+	limit := in.Limit
+	if limit == 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
 	projectID, _, err := s.gate()
 	if err != nil {
 		return nil, nil, err
@@ -290,40 +312,54 @@ func (s *Server) list(ctx context.Context, req *mcp.CallToolRequest, in listIn) 
 	if err != nil {
 		return nil, nil, err
 	}
-	teamLines, err := memory.TeamList(s.st, projectID, s.dir, gitBudget, time.Now())
+	filter := memory.Filter{Priority: in.Priority, Kind: in.Kind}
+	if in.Priority != "" || in.Kind != "" {
+		filtered := make([]memory.Ranked, 0, len(ranked))
+		for _, r := range ranked {
+			if filter.Matches(r.Entry) {
+				filtered = append(filtered, r)
+			}
+		}
+		ranked = filtered
+	}
+	var teamLines []string
+	if in.Priority == "" && in.Kind == "" {
+		teamLines, err = memory.TeamList(s.st, projectID, s.dir, gitBudget, time.Now())
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	// An unfiltered empty project keeps its established response. If filters
+	// exclude all entries, the empty result below reports the filtered total.
+	if in.Priority == "" && in.Kind == "" && len(ranked) == 0 && len(teamLines) == 0 {
+		return textResult("no memories for this project"), nil, nil
+	}
+	lines := make([]string, 0, len(ranked)+len(teamLines))
+	for _, r := range ranked {
+		line := memory.RenderEntry(r)
+		if r.Entry.SupersededBy.Valid {
+			line += fmt.Sprintf(" [superseded by %d]", r.Entry.SupersededBy.Int64)
+		}
+		lines = append(lines, line)
+	}
+	for _, line := range teamLines {
+		lines = append(lines, strings.TrimPrefix(line, "- "))
+	}
+	page, err := memory.PageItems(lines, memory.Page{Limit: limit, Offset: in.Offset})
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(ranked) == 0 && len(teamLines) == 0 {
-		return textResult("no memories for this project"), nil, nil
+	if len(page.Items) == 0 {
+		return textResult(fmt.Sprintf("no memories on this page (total %d)", page.Total)), nil, nil
 	}
-	return textResult(mergeRendered(renderEntries(ranked, true), teamLines)), nil, nil
-}
-
-// mergeRendered joins the personal block and team lines into one result.
-func mergeRendered(personal string, teamLines []string) string {
-	parts := make([]string, 0, 2)
-	if personal != "" {
-		parts = append(parts, personal)
-	}
-	if len(teamLines) > 0 {
-		parts = append(parts, strings.Join(teamLines, "\n"))
-	}
-	return strings.Join(parts, "\n")
-}
-
-func renderEntries(ranked []memory.Ranked, markSuperseded bool) string {
-	var b strings.Builder
-	for i, r := range ranked {
-		if i > 0 {
-			b.WriteByte('\n')
+	text := strings.Join(page.Items, "\n")
+	if footer := page.RangeFooter(); footer != "" {
+		if page.HasMore {
+			footer += fmt.Sprintf(" Next page: offset=%d.", page.To)
 		}
-		b.WriteString(memory.RenderEntry(r))
-		if markSuperseded && r.Entry.SupersededBy.Valid {
-			fmt.Fprintf(&b, " [superseded by %d]", r.Entry.SupersededBy.Int64)
-		}
+		text += "\n\n" + footer
 	}
-	return b.String()
+	return textResult(text), nil, nil
 }
 
 // gate re-evaluates the memory-active predicate on every call (consent,

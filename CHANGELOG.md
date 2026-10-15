@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2 - 2026-10-15
+
+### Changed
+
+- `agent-brain memory list` and the `memory_list` MCP tool show 50 entries per page by default, newest first, with a line saying how to get the next page. Use `--limit N` and `--offset N` (MCP: `limit`, `offset`, plus `priority` and `kind` filters); `--limit 0` lists everything.
+
 ## 0.5.1 - 2026-10-15
 
 ### Added

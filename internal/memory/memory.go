@@ -263,6 +263,11 @@ func normalizePriority(p string) (string, bool) {
 }
 
 func validKind(kind string) bool {
+	return ValidKind(kind)
+}
+
+// ValidKind reports whether kind is in the closed memory-kind vocabulary.
+func ValidKind(kind string) bool {
 	for _, k := range Kinds {
 		if k == kind {
 			return true

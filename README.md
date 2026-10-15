@@ -93,7 +93,9 @@ agent-brain entries. Until you do, Codex records nothing and reports no error �
 ```sh
 agent-brain stats              # token usage and cost, by day, project, model
 agent-brain stats --sessions   # per-session breakdown
-agent-brain memory list        # what your assistants have remembered
+agent-brain memory list        # 50 entries per page by default
+agent-brain memory list --offset 50
+agent-brain memory list --limit 0  # everything
 agent-brain memory show <id>   # inspect one entry
 agent-brain status             # integration health and collection activity
 ```
@@ -107,6 +109,11 @@ Memory is the reason this exists. Assistants forget everything between
 sessions, so they re-read the same files and re-ask the same questions. agent-brain
 gives them an MCP server with two tools — `memory_search` and `memory_save` —
 plus a session-start hook that injects the most relevant entries automatically.
+
+`agent-brain memory list` shows 50 entries at a time, active first and newest
+first. Page with `--limit N` and `--offset N`, filter before paging with `--kind`,
+`--priority` or `--critical`, and use `--limit 0` to list everything. `--all`
+includes superseded and deleted entries.
 
 Entries are typed (`decision`, `convention`, `task_state`, `fact`), carry the
 git state they were captured at, and are ranked so stale ones are flagged rather
