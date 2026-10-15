@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/ebrahim5801/agent-brain-cli/internal/fsutil"
 )
 
 const DefaultServerURL = "https://brain.ohnopixel.com"
@@ -331,7 +333,7 @@ func Save(cfg *Config) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpName, path)
+	return fsutil.Rename(tmpName, path)
 }
 
 // Update performs a locked read-modify-write so concurrent daemon and CLI

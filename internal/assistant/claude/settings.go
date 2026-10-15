@@ -74,10 +74,10 @@ func shellPath(path, goos string) string {
 	if goos == "windows" {
 		path = strings.ReplaceAll(path, `\`, "/")
 	}
-	unsafe := strings.IndexFunc(path, func(r rune) bool {
-		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("/._-:+,@%", r))
-	})
-	if unsafe < 0 {
+	safe := func(r rune) bool {
+		return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("/._-:+,@%", r)
+	}
+	if strings.IndexFunc(path, func(r rune) bool { return !safe(r) }) < 0 {
 		return path
 	}
 	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
