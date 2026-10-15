@@ -53,6 +53,7 @@ rebuilt byte for byte from the commit it was built from:
 | 0.5.0 | git tag `v0.5.0` | 1.26.9 |
 | 0.5.1 | 0c48102 (wecansync feat/link-offer-setting) | 1.26.9 |
 | 0.5.2 | 7e11a1a (wecansync feat/memory-list-paging) | 1.26.9 |
+| 0.5.3 | 38a36da (wecansync feat/memory-list-paging) | 1.26.9 |
 
 ## 3. Publish the site
 
