@@ -97,7 +97,7 @@
     <table>
       <thead><tr><th scope="col">Variable</th><th scope="col">Effect</th></tr></thead>
       <tbody>
-        <tr><td><code class="il">AGENT_BRAIN_VERSION=0.5.0</code></td><td>Pins a version instead of the latest.</td></tr>
+        <tr><td><code class="il">AGENT_BRAIN_VERSION=0.5.3</code></td><td>Pins a version instead of the latest.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_BIN_DIR=DIR</code></td><td>Picks the install folder.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_NO_INTEGRATE=1</code></td><td>Installs the binary only. Skips <code class="il">agent-brain install</code>.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_YES=1</code></td><td>Answers yes to prompts.</td></tr>
@@ -188,7 +188,7 @@ agent-brain install</code></pre>
 
   <h3>Inspect and edit entries</h3>
   <div class="cmd-ref">
-    <div class="cmd-ref-item"><code class="il">agent-brain memory list</code><p>Lists this project's memory entries.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory list</code><p>Lists this project's entries, active first and newest first: 50 per page by default. Use <code class="il">--limit N</code> and <code class="il">--offset N</code> to page, or <code class="il">--limit 0</code> for all; <code class="il">--kind</code>, <code class="il">--priority</code> and <code class="il">--critical</code> filter before paging. <code class="il">--all</code> includes superseded and deleted entries.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain memory show ID</code><p>Shows one entry in full.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain memory edit ID</code><p>Edits an entry's content in <code class="il">$EDITOR</code>, or pass <code class="il">--content</code>.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain memory priority ID critical|normal|background</code><p>Reclassifies how hard an entry competes for the session-start memory budget.</p></div>

@@ -66,7 +66,7 @@ func TestStdioHandshakeExposesTools(t *testing.T) {
 		t.Fatalf("tools/list: %v", err)
 	}
 
-	want := []string{"memory_capture_begin", "memory_capture_complete", "memory_capture_defer", "memory_capture_status", "memory_history", "memory_list", "memory_save", "memory_search", "memory_source_reference", "memory_status", "memory_verify_sources", "session_summary"}
+	want := []string{"memory_capture_begin", "memory_capture_complete", "memory_capture_defer", "memory_capture_status", "memory_history", "memory_list", "memory_save", "memory_search", "memory_source_reference", "memory_status", "memory_verify_sources", "session_summary", "usage_stats"}
 	got := map[string]*mcp.Tool{}
 	for _, tool := range res.Tools {
 		got[tool.Name] = tool

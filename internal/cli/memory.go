@@ -75,6 +75,8 @@ func newMemoryListCmd() *cobra.Command {
 	var priority string
 	var critical bool
 	var asJSON bool
+	var limit int
+	var offset int
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List this project's memory entries",
@@ -103,6 +105,9 @@ func newMemoryListCmd() *cobra.Command {
 			if priority != "" && !memory.ValidPriority(priority) {
 				return fmt.Errorf("unknown priority %q; want one of: %s", priority, strings.Join(memory.Priorities, ", "))
 			}
+			if kind != "" && !memory.ValidKind(kind) {
+				return fmt.Errorf("unknown kind %q; want one of: %s", kind, strings.Join(memory.Kinds, ", "))
+			}
 			if kind != "" || priority != "" {
 				filter := memory.Filter{Kind: kind, Priority: priority}
 				var filtered []memory.Ranked
@@ -113,6 +118,11 @@ func newMemoryListCmd() *cobra.Command {
 				}
 				entries = filtered
 			}
+			page, err := memory.PageItems(entries, memory.Page{Limit: limit, Offset: offset})
+			if err != nil {
+				return err
+			}
+			entries = page.Items
 			if asJSON {
 				return printMemoriesJSON(entries)
 			}
@@ -127,6 +137,12 @@ func newMemoryListCmd() *cobra.Command {
 				}
 				fmt.Println(line)
 			}
+			if footer := page.RangeFooter(); footer != "" {
+				if page.HasMore {
+					footer += fmt.Sprintf(" Next: agent-brain memory list --offset %d (or --limit 0 for all)", page.To)
+				}
+				fmt.Println(footer)
+			}
 			return nil
 		},
 	}
@@ -136,6 +152,8 @@ func newMemoryListCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&critical, "critical", false, "only critical entries (shorthand for --priority critical)")
 	cmd.MarkFlagsMutuallyExclusive("critical", "priority")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "machine-readable output")
+	cmd.Flags().IntVar(&limit, "limit", 50, "maximum entries to show (0 for all)")
+	cmd.Flags().IntVar(&offset, "offset", 0, "number of matching entries to skip")
 	return cmd
 }
 

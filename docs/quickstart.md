@@ -102,7 +102,9 @@ From then on, each session ends with the assistant distilling durable context
 (decisions, conventions, task state) into your local store, and each new session
 starts with that memory injected before any code is read — resuming a
 conversation instead of starting cold. Inspect it any time with
-`agent-brain memory list` / `show` / `edit` / `delete`.
+`agent-brain memory list` / `show` / `edit` / `delete`. The list shows 50 entries
+per page, active first and newest first; use `--limit N` and `--offset N` to page,
+`--limit 0` for all, and `--kind`, `--priority` or `--critical` to filter.
 
 Personal memory never leaves your machine. On a Team plan, memory can be shared
 with your team under a separate, per-project consent.

@@ -14,7 +14,7 @@ func Execute() int {
 	}
 	root.AddCommand(newInstallCmd(), newUninstallCmd(), newHookCmd(), newStatusCmd(), newStatsCmd(),
 		newLoginCmd(), newLogoutCmd(), newLinkCmd(), newUnlinkCmd(), newConsentCmd(),
-		newSyncCmd(), newDaemonCmd(), newMCPCmd(), newMemoryCmd(), newStorageCmd(), newUpdateCmd())
+		newSyncCmd(), newDaemonCmd(), newMCPCmd(), newMemoryCmd(), newStorageCmd(), newUpdateCmd(), newConfigCmd())
 	if err := root.Execute(); err != nil {
 		return 1
 	}

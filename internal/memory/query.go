@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,6 +29,61 @@ func (f Filter) Matches(e store.Memory) bool {
 		return false
 	}
 	return true
+}
+
+// Page describes a slice in a filtered, already ordered list. Limit <= 0 means
+// no limit, matching the CLI's explicit --limit 0 behavior.
+type Page struct {
+	Limit  int
+	Offset int
+}
+
+// PageResult contains the entries selected from the original list and the total
+// number of entries matching before paging. From and To are one-based inclusive
+// positions, or zero for an empty page.
+type PageResult[T any] struct {
+	Items   []T
+	Total   int
+	From    int
+	To      int
+	HasMore bool
+}
+
+// PageItems slices a filtered ordered sequence. The input must already be
+// filtered and ordered; keeping paging in this shared helper ensures the CLI and
+// MCP list expose identical page boundaries.
+func PageItems[T any](items []T, page Page) (PageResult[T], error) {
+	if page.Limit < 0 {
+		return PageResult[T]{}, fmt.Errorf("limit must be >= 0")
+	}
+	if page.Offset < 0 {
+		return PageResult[T]{}, fmt.Errorf("offset must be >= 0")
+	}
+	total := len(items)
+	if page.Offset >= total {
+		return PageResult[T]{Total: total}, nil
+	}
+	end := total
+	if page.Limit > 0 && page.Limit < total-page.Offset {
+		end = page.Offset + page.Limit
+	}
+	return PageResult[T]{
+		Items:   items[page.Offset:end],
+		Total:   total,
+		From:    page.Offset + 1,
+		To:      end,
+		HasMore: end < total,
+	}, nil
+}
+
+// RangeFooter returns a common range footer. The first page needs no footer
+// when it contains everything; subsequent pages keep the range even on the last
+// page. Callers supply their own next-page hint when HasMore is true.
+func (page PageResult[T]) RangeFooter() string {
+	if page.Total == 0 || (!page.HasMore && page.From <= 1) {
+		return ""
+	}
+	return fmt.Sprintf("Showing %d-%d of %d.", page.From, page.To, page.Total)
 }
 
 func (f Filter) matchesTeam(e store.TeamMemoryRow) bool {
