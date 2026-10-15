@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.4 - 2026-10-15
+
+### Added
+
+- A build can update from a release site instead of the cloud server. `-X github.com/ebrahim5801/agent-brain-cli/internal/config.DefaultUpdateURL=https://...` at build time, or `AGENT_BRAIN_UPDATE_URL` at run time, makes `agent-brain update` and the background updater read `releases/latest.json` and download `releases/<version>/<file>` from that site, as `packaging/release` lays it out. Downloads are still checked against the manifest's SHA-256. Only `https://` sites count, and a redirect away from https is refused. Sign-in, sync and memory keep using the cloud server. Source builds and the GoReleaser builds leave it empty and update from the cloud server as before.
+- `packaging/release` stamps its builds with `-update-url`, by default https://agentbrain.wecansync.com, the site it builds.
+
+### Changed
+
+- `agent-brain update` names the site it checks.
+
 ## 0.5.3 - 2026-10-15
 
 ### Fixed

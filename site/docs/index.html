@@ -97,7 +97,7 @@
     <table>
       <thead><tr><th scope="col">Variable</th><th scope="col">Effect</th></tr></thead>
       <tbody>
-        <tr><td><code class="il">AGENT_BRAIN_VERSION=0.5.3</code></td><td>Pins a version instead of the latest.</td></tr>
+        <tr><td><code class="il">AGENT_BRAIN_VERSION=0.5.4</code></td><td>Pins a version instead of the latest.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_BIN_DIR=DIR</code></td><td>Picks the install folder.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_NO_INTEGRATE=1</code></td><td>Installs the binary only. Skips <code class="il">agent-brain install</code>.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_YES=1</code></td><td>Answers yes to prompts.</td></tr>
@@ -251,7 +251,7 @@ agent-brain link &lt;project-key&gt;     # once per project, inside its director
 <section id="updating" aria-labelledby="updating-title">
   <p class="eyebrow docs-eyebrow">Maintenance</p>
   <h2 id="updating-title">Updating</h2>
-  <p>agent-brain updates itself in the background by default. You can also run the commands yourself:</p>
+  <p>agent-brain updates itself in the background by default. Installs from this site (0.5.4 and later) get their updates from this site; <code class="il">agent-brain update</code> names the site it checks. You can also run the commands yourself:</p>
   <div class="cmd-ref">
     <div class="cmd-ref-item"><code class="il">agent-brain update</code><p>Fetches the latest release and replaces the binary.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain update --check</code><p>Reports whether an update is available, then exits.</p></div>
