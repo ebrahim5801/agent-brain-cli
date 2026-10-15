@@ -450,6 +450,12 @@ func setMemoryCapture(t *testing.T, every, checkpoint *int) {
 
 func intPtr(v int) *int { return &v }
 
+// jsonPath is p as written inside a JSON string; Windows paths have backslashes.
+func jsonPath(p string) string {
+	b, _ := json.Marshal(p)
+	return string(b[1 : len(b)-1])
+}
+
 func TestDistillationFiresOncePerAssistant(t *testing.T) {
 	for _, tc := range []struct{ name, start, prompt, tool, stop string }{
 		{"cursor",
@@ -479,7 +485,7 @@ func TestDistillationFiresOncePerAssistant(t *testing.T) {
 			enableMemoryForTest(t)
 			setMemoryCapture(t, intPtr(1), nil)
 
-			fill := func(s string) string { return strings.ReplaceAll(s, "%s", proj) }
+			fill := func(s string) string { return strings.ReplaceAll(s, "%s", jsonPath(proj)) }
 			hookWith(t, "session-start", tc.name, fill(tc.start))
 			hookWith(t, "prompt", tc.name, fill(tc.prompt))
 			hookWith(t, "tool-use", tc.name, fill(tc.tool))
@@ -763,7 +769,7 @@ func TestCheckpointFiresOnToolThreshold(t *testing.T) {
 			checkpointToolThreshold = 3
 			t.Cleanup(func() { checkpointToolThreshold = restore })
 
-			fill := func(s string) string { return strings.ReplaceAll(s, "%s", proj) }
+			fill := func(s string) string { return strings.ReplaceAll(s, "%s", jsonPath(proj)) }
 			hookWith(t, "session-start", tc.name, fill(tc.start))
 
 			// First two tool-uses are below threshold: silent.
