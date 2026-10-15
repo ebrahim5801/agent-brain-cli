@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.5.5 - 2026-10-15
+
+### Fixed
+
+- Windows: agent-brain's Claude Code hooks never ran. Claude Code runs hook commands in Git Bash on Windows, which drops the backslashes from the `C:\...\agent-brain.exe` path agent-brain wrote, so every hook failed with "command not found" and no usage, sessions or memories were recorded. Hook commands now use forward slashes on Windows and quote a path a shell would split. `agent-brain status` reports hooks in the old form, and `agent-brain install` rewrites them. macOS and Linux hooks are written as before.
+- The store could fail to open with "database is locked" when several hooks started at the same moment, on every platform. agent-brain now switches the database to WAL mode once, with retries, instead of on every connection.
+- Windows: rewriting `config.json` or an assistant's settings file retries for up to two seconds when another process has the file open, instead of failing with "Access is denied".
+
+### Added
+
+- CI runs the tests on Windows and installs a release with `install.ps1`, then runs every Claude Code hook through Git Bash.
+
+## 0.5.4 - 2026-10-15
+
+### Added
+
+- A build can update from a release site instead of the cloud server. `-X github.com/ebrahim5801/agent-brain-cli/internal/config.DefaultUpdateURL=https://...` at build time, or `AGENT_BRAIN_UPDATE_URL` at run time, makes `agent-brain update` and the background updater read `releases/latest.json` and download `releases/<version>/<file>` from that site, as `packaging/release` lays it out. Downloads are still checked against the manifest's SHA-256. Only `https://` sites count, and a redirect away from https is refused. Sign-in, sync and memory keep using the cloud server. Source builds and the GoReleaser builds leave it empty and update from the cloud server as before.
+- `packaging/release` stamps its builds with `-update-url`, by default https://agentbrain.wecansync.com, the site it builds.
+
+### Changed
+
+- `agent-brain update` names the site it checks.
+
 ## 0.5.3 - 2026-10-15
 
 ### Fixed

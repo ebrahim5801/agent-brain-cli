@@ -19,6 +19,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/ebrahim5801/agent-brain-cli/internal/fsutil"
 )
 
 // Table is a TOML table to add or remove: a header like
@@ -466,5 +468,5 @@ func writeAtomic(path string, content []byte, existed bool) error {
 	if err := os.Chmod(tmp, perm); err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	return fsutil.Rename(tmp, path)
 }
