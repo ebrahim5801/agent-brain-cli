@@ -93,7 +93,7 @@ func TestCheckReportsNewer(t *testing.T) {
 	srv := releaseServer(t, "agent-brain_x.tar.gz", archive, sha256hex(archive))
 	defer srv.Close()
 
-	res, err := Check(context.Background(), srv.Client(), srv.URL, "1.0.0")
+	res, err := Check(context.Background(), srv.Client(), Source{Base: srv.URL}, "1.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestCheckReportsNewer(t *testing.T) {
 		t.Fatalf("res = %+v", res)
 	}
 
-	same, err := Check(context.Background(), srv.Client(), srv.URL, "1.4.0")
+	same, err := Check(context.Background(), srv.Client(), Source{Base: srv.URL}, "1.4.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestCheckReportsNewer(t *testing.T) {
 		t.Fatalf("1.4.0 vs 1.4.0 should not be newer")
 	}
 
-	dev, err := Check(context.Background(), srv.Client(), srv.URL, "dev")
+	dev, err := Check(context.Background(), srv.Client(), Source{Base: srv.URL}, "dev")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestApplyEndToEnd(t *testing.T) {
 	swapExecutable(t, target)
 
 	asset := release.Asset{OS: runtime.GOOS, Arch: runtime.GOARCH, Filename: filename, SHA256: sha256hex(archive)}
-	got, err := Apply(context.Background(), srv.Client(), srv.URL, asset)
+	got, err := Apply(context.Background(), srv.Client(), Source{Base: srv.URL}, Result{Latest: "1.4.0", Asset: asset})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestApplyZipArchive(t *testing.T) {
 	swapExecutable(t, target)
 
 	asset := release.Asset{OS: runtime.GOOS, Arch: runtime.GOARCH, Filename: filename, SHA256: sha256hex(archive)}
-	if _, err := Apply(context.Background(), srv.Client(), srv.URL, asset); err != nil {
+	if _, err := Apply(context.Background(), srv.Client(), Source{Base: srv.URL}, Result{Latest: "1.4.0", Asset: asset}); err != nil {
 		t.Fatal(err)
 	}
 	replaced, _ := os.ReadFile(target)
@@ -196,7 +196,7 @@ func TestApplyChecksumMismatch(t *testing.T) {
 	swapExecutable(t, target)
 
 	asset := release.Asset{OS: runtime.GOOS, Arch: runtime.GOARCH, Filename: filename, SHA256: "deadbeef"}
-	_, err := Apply(context.Background(), srv.Client(), srv.URL, asset)
+	_, err := Apply(context.Background(), srv.Client(), Source{Base: srv.URL}, Result{Latest: "1.4.0", Asset: asset})
 	if err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("err = %v, want checksum mismatch", err)
 	}
@@ -228,7 +228,7 @@ func TestApplySymlinkResolved(t *testing.T) {
 	swapExecutable(t, link)
 
 	asset := release.Asset{OS: runtime.GOOS, Arch: runtime.GOARCH, Filename: filename, SHA256: sha256hex(archive)}
-	got, err := Apply(context.Background(), srv.Client(), srv.URL, asset)
+	got, err := Apply(context.Background(), srv.Client(), Source{Base: srv.URL}, Result{Latest: "1.4.0", Asset: asset})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +270,7 @@ func TestApplyEACCESManualInstall(t *testing.T) {
 	swapExecutable(t, target)
 
 	asset := release.Asset{OS: runtime.GOOS, Arch: runtime.GOARCH, Filename: filename, SHA256: sha256hex(archive)}
-	_, err := Apply(context.Background(), srv.Client(), srv.URL, asset)
+	_, err := Apply(context.Background(), srv.Client(), Source{Base: srv.URL}, Result{Latest: "1.4.0", Asset: asset})
 	var manual *ErrManualInstall
 	if err == nil {
 		t.Fatal("expected ErrManualInstall")
@@ -290,4 +290,159 @@ func swapExecutable(t *testing.T, path string) {
 	prev := osExecutable
 	osExecutable = func() (string, error) { return path, nil }
 	t.Cleanup(func() { osExecutable = prev })
+}
+
+// staticSite serves a release the way packaging/release lays out a docroot:
+// releases/latest.json and releases/<version>/<file>. It records the paths
+// asked for so a test can prove the cloud endpoints were never used.
+func staticSite(t *testing.T, filename string, archive []byte, sha string, seen *[]string) *httptest.Server {
+	t.Helper()
+	m := release.Manifest{
+		Version: "1.4.0",
+		Assets: []release.Asset{
+			{OS: runtime.GOOS, Arch: runtime.GOARCH, Filename: filename, SHA256: sha, Size: int64(len(archive))},
+		},
+	}
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		*seen = append(*seen, r.URL.Path)
+		switch r.URL.Path {
+		case "/releases/latest.json":
+			_ = json.NewEncoder(w).Encode(m)
+		case "/releases/1.4.0/" + filename:
+			_, _ = w.Write(archive)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+}
+
+func TestStaticSourceCheckAndApply(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake binary is a POSIX shell script")
+	}
+	filename := "agent-brain_test.tar.gz"
+	archive := makeTarGz(t, binaryName(), []byte(fakeBinaryScript))
+	var seen []string
+	srv := staticSite(t, filename, archive, sha256hex(archive), &seen)
+	defer srv.Close()
+	src := Source{Base: srv.URL, Static: true}
+
+	res, err := Check(context.Background(), srv.Client(), src, "1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Newer || res.Latest != "1.4.0" || !res.HasAsset {
+		t.Fatalf("res = %+v", res)
+	}
+
+	dir := t.TempDir()
+	target := filepath.Join(dir, "agent-brain")
+	if err := os.WriteFile(target, []byte("OLD"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	swapExecutable(t, target)
+	if _, err := Apply(context.Background(), srv.Client(), src, res); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(target)
+	if string(got) != fakeBinaryScript {
+		t.Fatalf("target not replaced: %q", got)
+	}
+	for _, path := range seen {
+		if strings.HasPrefix(path, "/v1/") {
+			t.Fatalf("static source asked the cloud endpoint %s", path)
+		}
+	}
+}
+
+func TestStaticSourceRejectsTamperedArchive(t *testing.T) {
+	filename := "agent-brain_test.tar.gz"
+	archive := makeTarGz(t, binaryName(), []byte(fakeBinaryScript))
+	var seen []string
+	srv := staticSite(t, filename, archive, sha256hex([]byte("something else")), &seen)
+	defer srv.Close()
+	src := Source{Base: srv.URL, Static: true}
+
+	res, err := Check(context.Background(), srv.Client(), src, "1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	target := filepath.Join(dir, "agent-brain")
+	if err := os.WriteFile(target, []byte("OLD"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	swapExecutable(t, target)
+	if _, err := Apply(context.Background(), srv.Client(), src, res); err == nil {
+		t.Fatal("a checksum mismatch must fail the update")
+	}
+	if got, _ := os.ReadFile(target); string(got) != "OLD" {
+		t.Fatalf("target changed after a failed update: %q", got)
+	}
+}
+
+func TestSourceURLs(t *testing.T) {
+	static := Source{Base: "https://releases.example", Static: true}
+	if got := static.latestURL(); got != "https://releases.example/releases/latest.json" {
+		t.Fatalf("static latest = %s", got)
+	}
+	if got := static.downloadURL("0.5.4", "agent-brain_linux_amd64.tar.gz"); got != "https://releases.example/releases/0.5.4/agent-brain_linux_amd64.tar.gz" {
+		t.Fatalf("static download = %s", got)
+	}
+	if got := static.downloadURL("../x", "a/b.zip"); strings.Contains(got, "../") || strings.Contains(got, "a/b") {
+		t.Fatalf("static download must escape path parts: %s", got)
+	}
+	cloud := Source{Base: "https://cloud.example"}
+	if got := cloud.downloadURL("0.5.4", "agent-brain_linux_amd64.tar.gz"); got != "https://cloud.example/v1/cli/download/agent-brain_linux_amd64.tar.gz" {
+		t.Fatalf("cloud download = %s", got)
+	}
+}
+
+func TestHTTPSRedirectToHTTPIsRefused(t *testing.T) {
+	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(release.Manifest{Version: "9.9.9"})
+	}))
+	defer plain.Close()
+	secure := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, plain.URL+"/releases/latest.json", http.StatusFound)
+	}))
+	defer secure.Close()
+
+	_, err := Check(context.Background(), secure.Client(), Source{Base: secure.URL, Static: true}, "1.0.0")
+	if err == nil || !strings.Contains(err.Error(), "refusing a redirect") {
+		t.Fatalf("Check followed an https -> http redirect: err = %v", err)
+	}
+
+	asset := release.Asset{OS: runtime.GOOS, Arch: runtime.GOARCH, Filename: "agent-brain_test.tar.gz", SHA256: "00"}
+	dir := t.TempDir()
+	target := filepath.Join(dir, "agent-brain")
+	if err := os.WriteFile(target, []byte("OLD"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	swapExecutable(t, target)
+	_, err = Apply(context.Background(), secure.Client(), Source{Base: secure.URL, Static: true}, Result{Latest: "9.9.9", Asset: asset})
+	if err == nil || !strings.Contains(err.Error(), "refusing a redirect") {
+		t.Fatalf("Apply followed an https -> http redirect: err = %v", err)
+	}
+}
+
+func TestHTTPSRedirectToHTTPSIsFollowed(t *testing.T) {
+	archive := makeTarGz(t, "agent-brain", []byte("x"))
+	var seen []string
+	site := staticSite(t, "agent-brain_x.tar.gz", archive, sha256hex(archive), &seen)
+	defer site.Close()
+	tlsSite := httptest.NewUnstartedServer(site.Config.Handler)
+	tlsSite.StartTLS()
+	defer tlsSite.Close()
+	front := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tlsSite.URL+r.URL.Path, http.StatusFound)
+	}))
+	defer front.Close()
+	client := front.Client()
+	client.Transport.(*http.Transport).TLSClientConfig.RootCAs.AddCert(tlsSite.Certificate())
+
+	res, err := Check(context.Background(), client, Source{Base: front.URL, Static: true}, "1.0.0")
+	if err != nil || res.Latest != "1.4.0" {
+		t.Fatalf("Check over an https redirect: res = %+v, err = %v", res, err)
+	}
 }
