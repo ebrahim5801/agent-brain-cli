@@ -52,6 +52,8 @@ jobs:
       # Build the release, install it with install.ps1, and run its Claude Code
       # hooks through Git Bash, as Claude Code on Windows does.
       - name: Install and run the hooks
+        # Runs even when a test failed: it checks the installed product.
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: ./.github/scripts/windows-install-check.ps1
 
