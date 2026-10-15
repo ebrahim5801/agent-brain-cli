@@ -46,17 +46,22 @@ func (Adapter) Uninstall() error {
 
 func (Adapter) State() (assistant.State, error) {
 	s := assistant.State{Detected: Detected(), HookEventsWanted: ExpectedEventCount()}
-	events, err := InstalledEvents()
+	events, stale, err := installedHooks()
 	if err != nil {
 		return s, err
 	}
-	s.HookEvents = len(events)
+	s.HookEvents = len(events) - stale
 	registered, _, err := MCPRegistered()
 	if err != nil {
 		return s, err
 	}
 	s.MCPRegistered = registered
 	s.Tier = assistant.DeriveTier(s.HookEvents, s.HookEventsWanted, s.MCPRegistered)
+	if stale > 0 {
+		// Hooks that never run are a broken integration, not an MCP-only one:
+		// status reports them and `agent-brain install` rewrites them.
+		s.Tier = assistant.TierPartial
+	}
 	return s, nil
 }
 
