@@ -24,8 +24,10 @@ func newUpdateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Update agent-brain to the latest release",
-		Long: "Fetch and atomically replace this binary with the latest release from the\n" +
-			"agent-brain cloud. Use --check to only report, --auto to change automatic-update mode.",
+		Long: "Fetch and atomically replace this binary with the latest release from its\n" +
+			"update site (the agent-brain cloud unless the build or AGENT_BRAIN_UPDATE_URL\n" +
+			"names a release site). Use --check to only report, --auto to change\n" +
+			"automatic-update mode.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Clean up a leftover .old image from a prior Windows replace.
