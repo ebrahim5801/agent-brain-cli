@@ -28,7 +28,7 @@ func TestHookFailsSoftWhenPostgresUnreachable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	env := hookWith(t, "session-start", "claude-code", `{"session_id":"s1","cwd":"`+proj+`"}`)
+	env := hookWith(t, "session-start", "claude-code", `{"session_id":"s1","cwd":"`+js(proj)+`"}`)
 
 	// Exit 0 is guaranteed by runHook returning a string, not an error. Output
 	// must be empty (no injection) or, if present, syntactically valid JSON.

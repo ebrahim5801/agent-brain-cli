@@ -19,11 +19,18 @@ func capture(t *testing.T, fn func()) string {
 		t.Fatal(err)
 	}
 	os.Stdout = w
+	// Drain while fn writes: a pipe holds only a few KB on Windows, so a long
+	// output would otherwise block fn forever.
+	done := make(chan error, 1)
+	var buf bytes.Buffer
+	go func() {
+		_, err := io.Copy(&buf, r)
+		done <- err
+	}()
 	fn()
 	w.Close()
 	os.Stdout = old
-	var buf bytes.Buffer
-	if _, err := io.Copy(&buf, r); err != nil {
+	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
 	return buf.String()
