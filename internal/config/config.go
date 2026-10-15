@@ -142,10 +142,14 @@ type Config struct {
 	// offered again; local collection continues, and a later manual or --auto
 	// link clears the record.
 	LinkDeclines map[string]string `json:"link_declines,omitempty"`
-	Daemon       Daemon            `json:"daemon"`
-	Entitlement  *Entitlement      `json:"entitlement,omitempty"`
-	Storage      *Storage          `json:"storage,omitempty"`
-	Update       *UpdateConfig     `json:"update,omitempty"`
+	// LinkOffer turns on the session-start question asking whether an unlinked
+	// project should use agent-brain cloud. nil or false means off (the
+	// default); set with `agent-brain config link-offer on|off`.
+	LinkOffer   *bool         `json:"link_offer,omitempty"`
+	Daemon      Daemon        `json:"daemon"`
+	Entitlement *Entitlement  `json:"entitlement,omitempty"`
+	Storage     *Storage      `json:"storage,omitempty"`
+	Update      *UpdateConfig `json:"update,omitempty"`
 
 	// MemoryPackBudgetTokens bounds the session-start memory pack; 0 means
 	// the 2000-token default.
@@ -199,6 +203,12 @@ func (c *Config) memoryCaptureValue(field func(*MemoryCaptureConfig) *int, def i
 
 func (c *Config) SignedIn() bool {
 	return c.Token != ""
+}
+
+// LinkOfferEnabled reports whether the session-start link offer is on. It is
+// off unless the user explicitly turned it on.
+func (c *Config) LinkOfferEnabled() bool {
+	return c.LinkOffer != nil && *c.LinkOffer
 }
 
 // MemoryAuthToken returns the credential the memory pipeline should present.

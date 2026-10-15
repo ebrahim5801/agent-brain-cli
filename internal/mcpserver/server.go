@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ebrahim5801/agent-brain-cli/internal/attribution"
 	"github.com/ebrahim5801/agent-brain-cli/internal/config"
 	"github.com/ebrahim5801/agent-brain-cli/internal/diag"
@@ -20,6 +19,7 @@ import (
 	"github.com/ebrahim5801/agent-brain-cli/internal/memory"
 	"github.com/ebrahim5801/agent-brain-cli/internal/redact"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 const serverName = "agent-brain-memory"
@@ -74,6 +74,7 @@ func New(st *store.Store, dir, version string) *Server {
 	s.addHistoryTool()
 	s.addSourceTool()
 	s.addStatusTool()
+	s.addUsageTool()
 	return s
 }
 

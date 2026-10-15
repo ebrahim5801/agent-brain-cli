@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1 - 2026-10-15
+
+### Added
+
+- A read-only `usage_stats` MCP tool reports this machine's token usage: one session (with its subagent runs), today, and this week. It reads only the local store and works without memory, so editor extensions can show usage without starting the CLI.
+
+### Changed
+
+- The session-start question about linking a project to agent-brain cloud is off by default; turn it on with `agent-brain config link-offer on`.
+
 ## 0.5.0 - 2026-10-14
 
 ### Added

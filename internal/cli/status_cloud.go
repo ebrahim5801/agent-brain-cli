@@ -27,6 +27,12 @@ func printCloudStatus(st *store.Store) {
 		fmt.Println("  Consent:        not granted — nothing leaves this machine")
 	}
 
+	if cfg.LinkOfferEnabled() {
+		fmt.Println("  Link offer:     on (asks at session start for unlinked projects)")
+	} else {
+		fmt.Println("  Link offer:     off (turn on: agent-brain config link-offer on)")
+	}
+
 	linked := 0
 	localOnly := 0
 	rows, err := st.Query(`SELECT identity_kind || ':' || identity FROM projects`)

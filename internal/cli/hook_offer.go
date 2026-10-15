@@ -9,16 +9,20 @@ import (
 )
 
 // linkOfferNote returns a session-start context note offering to link an
-// unlinked project directory, or "" when no offer applies: not signed in
-// (--auto would just fail), already linked, or previously declined. Hooks run
-// non-interactively, so the offer is assistant-mediated — the note asks the
-// assistant to relay one yes/no question and record the answer via
-// `link --auto` or `link --decline`; a decline is permanent (FR: never
-// re-ask) and local collection continues either way.
+// unlinked project directory, or "" when no offer applies: the offer is turned
+// off (the default; see `config link-offer on`), not signed in (--auto would just
+// fail), already linked, or previously declined. Hooks run non-interactively,
+// so the offer is assistant-mediated — the note asks the assistant to relay one
+// yes/no question and record the answer via `link --auto` or `link --decline`;
+// a decline is permanent (FR: never re-ask) and local collection continues
+// either way.
 func linkOfferNote(logger *diag.Logger, cwd string) string {
 	cfg, err := config.Load()
 	if err != nil {
 		logger.Log("hook", "link offer: load config: %v", err)
+		return ""
+	}
+	if !cfg.LinkOfferEnabled() {
 		return ""
 	}
 	if !cfg.SignedIn() {
