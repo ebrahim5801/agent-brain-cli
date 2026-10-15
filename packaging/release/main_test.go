@@ -210,10 +210,22 @@ func TestVersionPattern(t *testing.T) {
 }
 
 func TestRunRejectsANonHTTPSUpdateURL(t *testing.T) {
-	for _, bad := range []string{"http://releases.example", "releases.example", "https://releases.example/x y"} {
+	for _, bad := range []string{
+		"http://releases.example", "releases.example", "https://releases.example/x y",
+		"https://trusted.example\t-X\tgithub.com/ebrahim5801/agent-brain-cli/internal/config.DefaultUpdateURL=https://evil.example",
+		"https://user@releases.example", "https://releases.example/?a=b", "https://",
+	} {
 		err := run("0.1.0", t.TempDir(), true, bad)
 		if err == nil || !strings.Contains(err.Error(), "-update-url") {
 			t.Errorf("run with -update-url %q: err = %v, want an -update-url error", bad, err)
+		}
+	}
+}
+
+func TestCheckUpdateURLAcceptsPlainHTTPS(t *testing.T) {
+	for _, good := range []string{"", "https://agentbrain.wecansync.com", "https://releases.example/agent-brain"} {
+		if err := checkUpdateURL(good); err != nil {
+			t.Errorf("checkUpdateURL(%q) = %v", good, err)
 		}
 	}
 }

@@ -79,6 +79,7 @@ func Apply(ctx context.Context, client *http.Client, src Source, res Result) (st
 	if client == nil {
 		client = &http.Client{Timeout: 5 * time.Minute}
 	}
+	client = noDowngrade(client)
 
 	target, err := osExecutable()
 	if err != nil {

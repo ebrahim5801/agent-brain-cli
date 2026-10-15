@@ -397,3 +397,52 @@ func TestSourceURLs(t *testing.T) {
 		t.Fatalf("cloud download = %s", got)
 	}
 }
+
+func TestHTTPSRedirectToHTTPIsRefused(t *testing.T) {
+	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(release.Manifest{Version: "9.9.9"})
+	}))
+	defer plain.Close()
+	secure := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, plain.URL+"/releases/latest.json", http.StatusFound)
+	}))
+	defer secure.Close()
+
+	_, err := Check(context.Background(), secure.Client(), Source{Base: secure.URL, Static: true}, "1.0.0")
+	if err == nil || !strings.Contains(err.Error(), "refusing a redirect") {
+		t.Fatalf("Check followed an https -> http redirect: err = %v", err)
+	}
+
+	asset := release.Asset{OS: runtime.GOOS, Arch: runtime.GOARCH, Filename: "agent-brain_test.tar.gz", SHA256: "00"}
+	dir := t.TempDir()
+	target := filepath.Join(dir, "agent-brain")
+	if err := os.WriteFile(target, []byte("OLD"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	swapExecutable(t, target)
+	_, err = Apply(context.Background(), secure.Client(), Source{Base: secure.URL, Static: true}, Result{Latest: "9.9.9", Asset: asset})
+	if err == nil || !strings.Contains(err.Error(), "refusing a redirect") {
+		t.Fatalf("Apply followed an https -> http redirect: err = %v", err)
+	}
+}
+
+func TestHTTPSRedirectToHTTPSIsFollowed(t *testing.T) {
+	archive := makeTarGz(t, "agent-brain", []byte("x"))
+	var seen []string
+	site := staticSite(t, "agent-brain_x.tar.gz", archive, sha256hex(archive), &seen)
+	defer site.Close()
+	tlsSite := httptest.NewUnstartedServer(site.Config.Handler)
+	tlsSite.StartTLS()
+	defer tlsSite.Close()
+	front := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tlsSite.URL+r.URL.Path, http.StatusFound)
+	}))
+	defer front.Close()
+	client := front.Client()
+	client.Transport.(*http.Transport).TLSClientConfig.RootCAs.AddCert(tlsSite.Certificate())
+
+	res, err := Check(context.Background(), client, Source{Base: front.URL, Static: true}, "1.0.0")
+	if err != nil || res.Latest != "1.4.0" {
+		t.Fatalf("Check over an https redirect: res = %+v, err = %v", res, err)
+	}
+}

@@ -8,6 +8,7 @@ package update
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -57,6 +58,7 @@ func Check(ctx context.Context, client *http.Client, src Source, current string)
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
 	}
+	client = noDowngrade(client)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src.latestURL(), nil)
 	if err != nil {
 		return Result{}, err
@@ -83,4 +85,26 @@ func Check(ctx context.Context, client *http.Client, src Source, current string)
 		res.Newer = compareVersions(m.Version, current) > 0
 	}
 	return res, nil
+}
+
+// noDowngrade returns a copy of client that refuses a redirect from https to
+// any other scheme. The manifest's SHA-256 only protects an archive if the
+// manifest itself came over TLS, so a release source's https must also cover
+// wherever it redirects.
+func noDowngrade(client *http.Client) *http.Client {
+	c := *client
+	next := client.CheckRedirect
+	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) > 0 && via[0].URL.Scheme == "https" && req.URL.Scheme != "https" {
+			return fmt.Errorf("refusing a redirect from https to %s", req.URL.Redacted())
+		}
+		if next != nil {
+			return next(req, via)
+		}
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return nil
+	}
+	return &c
 }
