@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.6 - 2026-10-16
+
+### Fixed
+
+- A Claude Code session got a new memory handle each time its shell changed into a subfolder of the repository, and the MCP server, which checks handles against the folder Claude Code started in, rejected those handles with "session attribution does not match project or checkout". Hooks now take the session's folder from `CLAUDE_PROJECT_DIR`, the folder Claude Code started in, and a binding's checkout is the root of its git checkout, so a session keeps one handle. Handles that 0.5.5 issued in a subfolder are accepted again, and a session that only has such a handle keeps using it.
+- The Stop hook could block every reply with a new capture request when the agent could not act on the previous one. It now issues no new request of the same kind (stop, or checkpoint) while an earlier one was delivered and never begun. Beginning or deferring that request re-arms capture.
+- `memory_capture_defer` accepts a request that was never begun, so an agent can always acknowledge one it cannot carry out.
+- `memory_capture_status` without a `batch_id` returned its batches as a JSON array, which Claude Code's MCP client rejects ("expected record, received array"). It now returns `{"batches": [...]}`.
+- `usage_stats` adds up every local row of a session, so a session that an earlier version split by folder is reported in full.
+- Redaction missed credential keys with a prefix, such as `"memory_token": "..."` or `refresh_token=...`. They are now redacted before memories are stored or synced.
+
 ## 0.5.5 - 2026-10-15
 
 ### Fixed
