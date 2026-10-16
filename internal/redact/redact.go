@@ -35,7 +35,8 @@ var rules = []rule{
 	{kind: "mailgun-key", re: regexp.MustCompile(`\bkey-[0-9a-f]{32}\b`)},
 	{kind: "jwt", re: regexp.MustCompile(`\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b`)},
 	{kind: "bearer", re: regexp.MustCompile(`(?i)\b(?:bearer|authorization:\s*bearer)\s+([A-Za-z0-9_\-.~+/=]{16,})`), group: 1},
-	{kind: "credential", re: regexp.MustCompile(`(?i)\b(password|passwd|secret|api[_-]?key|access[_-]?key|auth[_-]?token|client[_-]?secret|token)\b["']?\s*[:=]+\s*["']?([^\s"']{8,})["']?`), group: 2},
+	// A prefixed key such as memory_token or refresh_token is a credential too.
+	{kind: "credential", re: regexp.MustCompile(`(?i)\b(?:[a-z0-9]+[_-])*(password|passwd|secret|api[_-]?key|access[_-]?key|auth[_-]?token|client[_-]?secret|token)\b["']?\s*[:=]+\s*["']?([^\s"']{8,})["']?`), group: 2},
 	{kind: "url-credential", re: regexp.MustCompile(`\b([a-z][a-z0-9+.-]*://[^/\s:@]+):([^@\s]+)@`), group: 2},
 	// Long opaque runs only in credential-shaped contexts, to keep prose and
 	// commit hashes intact: 40-hex (git SHAs) are deliberately not matched.

@@ -444,7 +444,10 @@ func (s *Store) DeferCapture(id string, b SessionBinding, generation int64, reas
 	if err := tx.QueryRow(s.Rebind(`SELECT state,COALESCE(executor_handle,''),generation,retries FROM memory_capture_batches WHERE id=? AND project_id=?`), id, b.ProjectID).Scan(&state, &executor, &gen, &retries); err != nil {
 		return CaptureBatch{}, ErrAttribution
 	}
-	if state != "in_progress" || gen != generation || executor != b.Handle {
+	// A batch nobody has begun can be deferred directly, so an agent can always
+	// acknowledge a capture request it cannot carry out.
+	unbegun := state == "pending" && executor == ""
+	if !(unbegun || state == "in_progress" && executor == b.Handle) || gen != generation {
 		return CaptureBatch{}, ErrCaptureConflict
 	}
 	next := ""
@@ -460,7 +463,7 @@ func (s *Store) DeferCapture(id string, b SessionBinding, generation int64, reas
 		}
 		next = now.Add(delay).UTC().Format(TimeLayout)
 	}
-	if _, err := s.ExecTx(tx, `UPDATE memory_capture_batches SET state=?,lease_until='',retries=retries+1,next_retry=?,updated_at=? WHERE id=? AND project_id=?`, state, next, now.UTC().Format(TimeLayout), id, b.ProjectID); err != nil {
+	if _, err := s.ExecTx(tx, `UPDATE memory_capture_batches SET state=?,executor_handle=?,lease_until='',retries=retries+1,next_retry=?,updated_at=? WHERE id=? AND project_id=?`, state, b.Handle, next, now.UTC().Format(TimeLayout), id, b.ProjectID); err != nil {
 		return CaptureBatch{}, err
 	}
 	if err := tx.Commit(); err != nil {
