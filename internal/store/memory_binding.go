@@ -24,8 +24,7 @@ type SessionBinding struct {
 	Provenance   string `json:"provenance"`
 }
 
-// CanonicalDir is dir made absolute with symlinks resolved.
-func CanonicalDir(dir string) string {
+func CheckoutIdentity(dir string) string {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return filepath.Clean(dir)
@@ -36,22 +35,20 @@ func CanonicalDir(dir string) string {
 	return filepath.Clean(abs)
 }
 
-// CheckoutIdentity names the checkout dir belongs to: the root of its git
-// checkout, or dir itself outside git. A shell that changes into a subfolder
-// stays in the same checkout.
-func CheckoutIdentity(dir string) string {
-	dir = CanonicalDir(dir)
+// checkoutRoot is the root of the git checkout dir lies in, or dir itself
+// outside git. Bindings store the folder a session started in; they are
+// matched by checkout root, so a hook whose folder followed the shell's `cd`
+// (or a binding 0.5.5 stored for a subfolder) still names the same session.
+func checkoutRoot(dir string) string {
+	dir = CheckoutIdentity(dir)
 	if root := attribution.RepoRoot(dir); root != "" {
-		return CanonicalDir(root)
+		return CheckoutIdentity(root)
 	}
 	return dir
 }
 
-// sameCheckout compares a stored checkout with a requested one. Bindings
-// written before 0.5.6 stored the shell's folder, so both sides are reduced to
-// their checkout identity.
 func sameCheckout(stored, requested string) bool {
-	return CheckoutIdentity(stored) == CheckoutIdentity(requested)
+	return checkoutRoot(stored) == checkoutRoot(requested)
 }
 
 // EnsureBoundSession serializes session creation across hook processes without
@@ -108,9 +105,9 @@ func (s *Store) EnsureBoundSession(projectID int64, assistant, native, checkout,
 }
 
 // findSessionBinding fills b from the binding of b's native session in b's
-// checkout. A row with the exact checkout wins; otherwise the oldest row whose
-// stored folder lies in the same checkout (written before 0.5.6) is reused, so
-// an upgrade does not split a running session again.
+// checkout. A row with the exact folder wins; otherwise the oldest row in the
+// same checkout is reused, so changing folders, or upgrading from 0.5.5, does
+// not split a running session.
 func (s *Store) findSessionBinding(tx *sql.Tx, b *SessionBinding) error {
 	rows, err := tx.Query(s.Rebind(`SELECT handle,session_id,COALESCE(parent_handle,''),checkout FROM memory_session_bindings WHERE project_id=? AND assistant=? AND native_id=? ORDER BY CASE WHEN checkout=? THEN 0 ELSE 1 END,created_at,handle`), b.ProjectID, b.Assistant, b.NativeID, b.Checkout)
 	if err != nil {
