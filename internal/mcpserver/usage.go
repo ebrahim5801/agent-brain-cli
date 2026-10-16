@@ -2,9 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-	"fmt"
 	"time"
 
 	"github.com/ebrahim5801/agent-brain-cli/internal/stats"
@@ -112,14 +109,14 @@ func currentWeekStart(now time.Time) string {
 	return now.AddDate(0, 0, -daysSinceMonday).Format("2006-01-02")
 }
 
+// sessionUsage totals every local session row of one Claude Code session.
+// Before 0.5.6 a session that changed folders was split over several rows.
 func sessionUsage(st *store.Store, sessionID string) (*usageSession, error) {
 	query := `
         SELECT s.id, s.input_tokens, s.output_tokens, s.started_at,
                COALESCE(s.ended_at, (SELECT MAX(e.occurred_at) FROM events e WHERE e.session_id = s.id), s.started_at)
         FROM sessions s
-        WHERE s.assistant = 'claude-code' AND s.parent_session_id IS NULL AND s.external_id = ?
-        ORDER BY s.started_at DESC, s.id DESC
-        LIMIT 1`
+        WHERE s.assistant = 'claude-code' AND s.parent_session_id IS NULL AND s.external_id = ?`
 	args := []any{sessionID}
 	if st.MemoryV2 {
 		query = `
@@ -130,63 +127,69 @@ func sessionUsage(st *store.Store, sessionID string) (*usageSession, error) {
           AND (s.external_id = ? OR EXISTS (
               SELECT 1 FROM memory_session_bindings b
               WHERE b.session_id = s.id AND b.assistant = 'claude-code' AND b.native_id = ?
-          ))
-        ORDER BY s.started_at DESC, s.id DESC
-        LIMIT 1`
+          ))`
 		args = []any{sessionID, sessionID}
 	}
 
-	var localID int64
-	var ownInput, ownOutput int64
-	var startedAt, endedAt string
-	err := st.QueryRow(query, args...).Scan(&localID, &ownInput, &ownOutput, &startedAt, &endedAt)
-	if errors.Is(err, sql.ErrNoRows) {
+	rows, err := st.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	result := &usageSession{ID: sessionID}
+	var localIDs []int64
+	var first, last time.Time
+	for rows.Next() {
+		var localID, input, output int64
+		var startedAt, endedAt string
+		if err := rows.Scan(&localID, &input, &output, &startedAt, &endedAt); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		localIDs = append(localIDs, localID)
+		result.InputTokens += input
+		result.OutputTokens += output
+		// An unparseable timestamp costs only the duration, not the whole report.
+		if start, err := time.Parse(time.RFC3339Nano, startedAt); err == nil && (first.IsZero() || start.Before(first)) {
+			first = start
+		}
+		if end, err := time.Parse(time.RFC3339Nano, endedAt); err == nil && end.After(last) {
+			last = end
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	if len(localIDs) == 0 {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, err
+	if !first.IsZero() && last.After(first) {
+		result.DurationSeconds = last.Unix() - first.Unix()
 	}
-	// An unparseable timestamp costs only the duration, not the whole report.
-	duration, _ := sessionDurationSeconds(startedAt, endedAt)
 
-	result := &usageSession{
-		ID:              sessionID,
-		InputTokens:     ownInput,
-		OutputTokens:    ownOutput,
-		DurationSeconds: duration,
+	for _, localID := range localIDs {
+		if err := addLaneUsage(st, localID, result); err != nil {
+			return nil, err
+		}
 	}
-	rows, err := st.Query(`SELECT input_tokens, output_tokens FROM sessions WHERE parent_session_id = ?`, localID)
+	return result, nil
+}
+
+func addLaneUsage(st *store.Store, parentID int64, result *usageSession) error {
+	rows, err := st.Query(`SELECT input_tokens, output_tokens FROM sessions WHERE parent_session_id = ?`, parentID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var input, output int64
 		if err := rows.Scan(&input, &output); err != nil {
-			return nil, err
+			return err
 		}
 		result.LaneRuns++
 		result.LaneInputTokens += input
 		result.LaneOutputTokens += output
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
-func sessionDurationSeconds(startedAt, endedAt string) (int64, error) {
-	start, err := time.Parse(time.RFC3339Nano, startedAt)
-	if err != nil {
-		return 0, fmt.Errorf("parse session start time: %w", err)
-	}
-	end, err := time.Parse(time.RFC3339Nano, endedAt)
-	if err != nil {
-		return 0, fmt.Errorf("parse session end time: %w", err)
-	}
-	seconds := end.Unix() - start.Unix()
-	if seconds < 0 {
-		return 0, nil
-	}
-	return seconds, nil
+	return rows.Err()
 }

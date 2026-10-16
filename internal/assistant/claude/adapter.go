@@ -3,6 +3,8 @@ package claude
 import (
 	"encoding/json"
 	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/ebrahim5801/agent-brain-cli/internal/assistant"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
@@ -72,13 +74,24 @@ func (Adapter) ParseHook(event string, r io.Reader) (assistant.HookInput, error)
 	}
 	return assistant.HookInput{
 		SessionKey:     p.SessionID,
-		Cwd:            p.Cwd,
+		Cwd:            sessionDir(p.Cwd),
 		TranscriptPath: p.TranscriptPath,
 		ToolName:       p.ToolName,
 		// SubagentStop always carries the finished subagent's agent_id but
 		// fires in the parent conversation, so it is not "from" the subagent.
 		FromSubagent: p.AgentID != "" && event != assistant.EventSubagentStop,
 	}, nil
+}
+
+// sessionDir is the folder a hook attributes its session to. The payload's cwd
+// follows the shell's `cd`; CLAUDE_PROJECT_DIR stays where Claude Code started,
+// which is also where it starts the MCP server, so hooks and MCP calls agree on
+// the project and checkout.
+func sessionDir(cwd string) string {
+	if dir := os.Getenv("CLAUDE_PROJECT_DIR"); filepath.IsAbs(dir) {
+		return dir
+	}
+	return cwd
 }
 
 // BackfillUsage recovers absolute token totals from the session transcript at
