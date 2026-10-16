@@ -27,13 +27,13 @@ func newMCPCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				if store.CanonicalDir(actual) != store.CanonicalDir(requiredConfig) {
+				if store.CheckoutIdentity(actual) != store.CheckoutIdentity(requiredConfig) {
 					return fmt.Errorf("refusing MCP startup: required configuration directory was not forwarded")
 				}
 			}
 			if requiredData != "" {
 				actual := os.Getenv("AGENT_BRAIN_DATA_DIR")
-				if actual == "" || store.CanonicalDir(actual) != store.CanonicalDir(requiredData) {
+				if actual == "" || store.CheckoutIdentity(actual) != store.CheckoutIdentity(requiredData) {
 					return fmt.Errorf("refusing MCP startup: required data directory was not forwarded")
 				}
 				cfg, err := config.Load()
