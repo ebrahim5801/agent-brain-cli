@@ -8,7 +8,7 @@
 # toolchain is needed. Works in Windows PowerShell 5.1 and PowerShell 7.
 #
 # Environment (set with $env:NAME = "value" before running):
-#   AGENT_BRAIN_VERSION=0.5.3     install this version instead of the latest
+#   AGENT_BRAIN_VERSION=0.5.6     install this version instead of the latest
 #   AGENT_BRAIN_BIN_DIR=DIR       install directory (default %LOCALAPPDATA%\Programs\agent-brain)
 #   AGENT_BRAIN_NO_INTEGRATE=1    install the binary only
 #   AGENT_BRAIN_YES=1             integrate every detected assistant without asking

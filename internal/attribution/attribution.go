@@ -41,6 +41,13 @@ func Resolve(dir string) Project {
 	return Project{Kind: KindRepoRoot, Identity: root, DisplayName: filepath.Base(root)}
 }
 
+// RepoRoot returns the root of the git checkout enclosing dir (a linked
+// worktree is its own checkout), or "" when dir is not inside one.
+func RepoRoot(dir string) string {
+	root, _ := findRepo(dir)
+	return root
+}
+
 // findRepo walks up from dir looking for a .git entry. Returns the repo root
 // and the resolved git directory (handling .git files used by worktrees and
 // submodules, including their commondir indirection).

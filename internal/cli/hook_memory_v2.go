@@ -60,6 +60,17 @@ func v2CaptureReason(st *store.Store, logger *diag.Logger, sessionID, projectID 
 			trigger = "periodic"
 		}
 	}
+	// A request that was delivered but never begun is not followed by another of
+	// the same kind: an agent that cannot act on it would be blocked at every
+	// stop without progress. Beginning or deferring it re-arms capture.
+	class := "trigger='stop'"
+	if trigger != "stop" {
+		class = "trigger IN ('checkpoint','periodic')"
+	}
+	var unanswered int
+	if err := st.QueryRow(`SELECT COUNT(*) FROM memory_capture_batches WHERE source_handle=? AND `+class+` AND state='pending' AND executor_handle IS NULL AND retries>0 AND watermark<>?`, handle, watermark).Scan(&unanswered); err != nil || unanswered > 0 {
+		return ""
+	}
 	batch, err := st.RequestCapture(binding, trigger, watermark, time.Now())
 	if err != nil {
 		logger.Log("memory", "capture request failed: %v", err)

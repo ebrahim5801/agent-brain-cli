@@ -88,7 +88,11 @@ func (s *Server) captureStatus(ctx context.Context, req *mcp.CallToolRequest, in
 	if err != nil {
 		return nil, nil, err
 	}
-	return captureResult(batches)
+	// MCP structured content must be an object, never a bare array.
+	if batches == nil {
+		batches = []store.CaptureBatch{}
+	}
+	return captureResult(map[string]any{"batches": batches})
 }
 
 func (s *Server) captureDefer(ctx context.Context, req *mcp.CallToolRequest, in captureIn) (*mcp.CallToolResult, any, error) {

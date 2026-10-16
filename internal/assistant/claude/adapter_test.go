@@ -2,6 +2,7 @@ package claude
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -73,5 +74,28 @@ func TestParseHookFromSubagent(t *testing.T) {
 				t.Errorf("FromSubagent = %v, want %v", in.FromSubagent, tc.want)
 			}
 		})
+	}
+}
+
+func TestParseHookUsesTheProjectDirNotTheShellDir(t *testing.T) {
+	project := t.TempDir()
+	payload := `{"session_id":"s","cwd":` + strconv.Quote(project+"/apps/api") + `}`
+
+	t.Setenv("CLAUDE_PROJECT_DIR", project)
+	in, err := Adapter{}.ParseHook(assistant.EventToolUse, strings.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Cwd != project {
+		t.Errorf("Cwd = %q, want the project dir %q", in.Cwd, project)
+	}
+
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
+	in, err = Adapter{}.ParseHook(assistant.EventToolUse, strings.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Cwd != project+"/apps/api" {
+		t.Errorf("without CLAUDE_PROJECT_DIR, Cwd = %q, want the payload cwd", in.Cwd)
 	}
 }

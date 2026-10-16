@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/ebrahim5801/agent-brain-cli/internal/assistant/settingsfile"
@@ -56,6 +57,30 @@ func Detected() bool {
 	}
 	_, err := exec.LookPath("claude")
 	return err == nil
+}
+
+// hookCommand is the shell command Claude Code runs for one agent-brain hook.
+// Claude Code hands it to sh on macOS and Linux, and to Git Bash on Windows (or
+// PowerShell when Git Bash is missing). A bare Windows path loses its
+// backslashes in bash ("C:\a" reads as "C:a"), so on Windows the path is
+// written with forward slashes, which Windows and all three shells accept. A
+// path with characters a shell would split or expand is single-quoted; sh and
+// bash accept that, PowerShell does not, so such a path needs Git Bash.
+func hookCommand(binPath, sub string) string {
+	return shellPath(binPath, runtime.GOOS) + " hook " + sub
+}
+
+func shellPath(path, goos string) string {
+	if goos == "windows" {
+		path = strings.ReplaceAll(path, `\`, "/")
+	}
+	safe := func(r rune) bool {
+		return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("/._-:+,@%", r)
+	}
+	if strings.IndexFunc(path, func(r rune) bool { return !safe(r) }) < 0 {
+		return path
+	}
+	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
 }
 
 func isOurs(command string) bool {
@@ -131,7 +156,7 @@ func Install(binPath string) (backupPath string, err error) {
 			entry := map[string]any{
 				"hooks": []any{map[string]any{
 					"type":    "command",
-					"command": binPath + " hook " + he.Sub,
+					"command": hookCommand(binPath, he.Sub),
 					"timeout": 10,
 				}},
 			}
@@ -167,19 +192,32 @@ func Uninstall() error {
 // InstalledEvents returns the Claude Code events that currently carry an
 // agent-brain hook entry in the settings file.
 func InstalledEvents() ([]string, error) {
+	events, _, err := installedHooks()
+	return events, err
+}
+
+// unrunnable reports a hook command written by releases before 0.5.5 on
+// Windows: a bare C:\... or \\server\... path, which Git Bash, the shell
+// Claude Code runs hooks in there, reads without its backslashes.
+func unrunnable(command string) bool {
+	return len(command) >= 3 && command[1] == ':' && command[2] == '\\' || strings.HasPrefix(command, `\\`)
+}
+
+// installedHooks returns the events carrying an agent-brain hook entry and how
+// many of those entries cannot run (see unrunnable).
+func installedHooks() (events []string, stale int, err error) {
 	path, err := SettingsPath()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	root, existed, err := settingsfile.Load(path)
 	if err != nil || !existed {
-		return nil, err
+		return nil, 0, err
 	}
 	hooks, ok := root["hooks"].(map[string]any)
 	if !ok {
-		return nil, nil
+		return nil, 0, nil
 	}
-	var events []string
 	for _, he := range hookEvents {
 		groups, ok := hooks[he.Event].([]any)
 		if !ok {
@@ -195,12 +233,15 @@ func InstalledEvents() ([]string, error) {
 				if hook, ok := h.(map[string]any); ok {
 					if cmd, _ := hook["command"].(string); isOurs(cmd) {
 						events = append(events, he.Event)
+						if unrunnable(cmd) {
+							stale++
+						}
 					}
 				}
 			}
 		}
 	}
-	return events, nil
+	return events, stale, nil
 }
 
 // ExpectedEventCount is how many hook events a healthy install registers.
