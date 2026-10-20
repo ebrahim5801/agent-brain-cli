@@ -3,6 +3,7 @@ package tomlfile
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -450,7 +451,8 @@ func TestUpsertPreservesFilePermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fi.Mode().Perm() != 0o600 {
+	// Windows has no Unix modes; Go reports every writable file as 0666.
+	if fi.Mode().Perm() != 0o600 && runtime.GOOS != "windows" {
 		t.Errorf("permissions widened to %v", fi.Mode().Perm())
 	}
 }

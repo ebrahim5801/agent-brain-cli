@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -159,7 +160,8 @@ func TestWriteAtomicPreservesLargeIntegersAndPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if perm := fi.Mode().Perm(); perm != 0o600 {
+	// Windows has no Unix modes; Go reports every writable file as 0666.
+	if perm := fi.Mode().Perm(); perm != 0o600 && runtime.GOOS != "windows" {
 		t.Errorf("permissions widened from 0600 to %o", perm)
 	}
 }
@@ -218,7 +220,8 @@ func TestBackupPreservesRestrictiveMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if perm := fi.Mode().Perm(); perm != 0o600 {
+	// Windows has no Unix modes; Go reports every writable file as 0666.
+	if perm := fi.Mode().Perm(); perm != 0o600 && runtime.GOOS != "windows" {
 		t.Fatalf("backup mode = %o, want 0600 (must mirror the 0600 source, not widen it)", perm)
 	}
 }

@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.5.6 - 2026-10-16
+
+### Fixed
+
+- A Claude Code session got a new memory handle each time its shell changed into a subfolder of the repository, and the MCP server, which checks handles against the folder Claude Code started in, rejected those handles with "session attribution does not match project or checkout". Hooks now take the session's folder from `CLAUDE_PROJECT_DIR`, the folder Claude Code started in, and session handles are matched by the root of their git checkout, so a session keeps one handle. Handles that 0.5.5 issued in a subfolder are accepted again, and a session that only has such a handle keeps using it. Checkout-scoped memories and artifact evidence still use the exact folder.
+- The Stop hook could block every reply with a new capture request when the agent could not act on the previous one. It now issues no new request of the same kind (stop, or checkpoint) while an earlier one was delivered and never begun. Beginning or deferring that request re-arms capture.
+- `memory_capture_defer` accepts a request that was never begun, so an agent can always acknowledge one it cannot carry out.
+- `memory_capture_status` without a `batch_id` returned its batches as a JSON array, which Claude Code's MCP client rejects ("expected record, received array"). It now returns `{"batches": [...]}`.
+- `usage_stats` adds up every local row of a session, so a session that an earlier version split by folder is reported in full.
+- Redaction missed credential keys with a prefix, such as `"memory_token": "..."` or `refresh_token=...`. They are now redacted before memories are stored or synced.
+
+## 0.5.5 - 2026-10-15
+
+### Fixed
+
+- Windows: agent-brain's Claude Code hooks never ran. Claude Code runs hook commands in Git Bash on Windows, which drops the backslashes from the `C:\...\agent-brain.exe` path agent-brain wrote, so every hook failed with "command not found" and no usage, sessions or memories were recorded. Hook commands now use forward slashes on Windows and quote a path a shell would split. `agent-brain status` reports hooks in the old form, and `agent-brain install` rewrites them. macOS and Linux hooks are written as before.
+- The store could fail to open with "database is locked" when several hooks started at the same moment, on every platform. agent-brain now switches the database to WAL mode once, with retries, instead of on every connection.
+- Windows: rewriting `config.json` or an assistant's settings file retries for up to two seconds when another process has the file open, instead of failing with "Access is denied".
+
+### Added
+
+- CI runs the tests on Windows and installs a release with `install.ps1`, then runs every Claude Code hook through Git Bash.
+
+## 0.5.4 - 2026-10-15
+
+### Added
+
+- A build can update from a release site instead of the cloud server. `-X github.com/ebrahim5801/agent-brain-cli/internal/config.DefaultUpdateURL=https://...` at build time, or `AGENT_BRAIN_UPDATE_URL` at run time, makes `agent-brain update` and the background updater read `releases/latest.json` and download `releases/<version>/<file>` from that site, as `packaging/release` lays it out. Downloads are still checked against the manifest's SHA-256. Only `https://` sites count, and a redirect away from https is refused. Sign-in, sync and memory keep using the cloud server. Source builds and the GoReleaser builds leave it empty and update from the cloud server as before.
+- `packaging/release` stamps its builds with `-update-url`, by default https://agentbrain.wecansync.com, the site it builds.
+
+### Changed
+
+- `agent-brain update` names the site it checks.
+
 ## 0.5.3 - 2026-10-15
 
 ### Fixed
