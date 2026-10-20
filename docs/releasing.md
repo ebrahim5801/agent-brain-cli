@@ -62,6 +62,7 @@ rebuilt byte for byte from the commit it was built from:
 | 0.5.4 | e95b32d (wecansync feat/update-url) | 1.26.9 |
 | 0.5.5 | 65dbb8d (wecansync ci/windows) | 1.26.9 |
 | 0.5.6 | 38d8686 (wecansync fix/session-checkout) | 1.26.9 |
+| 0.5.7 | 1682ced (wecansync feat/free-local-memory) | 1.26.9 |
 
 ## 3. Publish the site
 
