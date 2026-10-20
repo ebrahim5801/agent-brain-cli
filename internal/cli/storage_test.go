@@ -22,11 +22,16 @@ func captureStdout(t *testing.T, fn func() error) (string, error) {
 		t.Fatal(err)
 	}
 	os.Stdout = w
+	// Read while fn writes; see capture.
+	out := make(chan []byte, 1)
+	go func() {
+		b, _ := io.ReadAll(r)
+		out <- b
+	}()
 	runErr := fn()
 	w.Close()
 	os.Stdout = old
-	out, _ := io.ReadAll(r)
-	return string(out), runErr
+	return string(<-out), runErr
 }
 
 func runStorageStatus(t *testing.T) (string, error) {

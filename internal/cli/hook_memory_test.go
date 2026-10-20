@@ -49,7 +49,7 @@ func TestRecordCitationsIntersectionGuard(t *testing.T) {
 	if err := os.WriteFile(transcript, []byte(""), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	hookWith(t, "session-start", "claude-code", `{"session_id":"cit1","cwd":"`+proj+`","transcript_path":"`+transcript+`"}`)
+	hookWith(t, "session-start", "claude-code", `{"session_id":"cit1","cwd":"`+js(proj)+`","transcript_path":"`+js(transcript)+`"}`)
 
 	st := openTestStore(t)
 	var sessionID, projectID int64
@@ -78,7 +78,7 @@ func TestRecordCitationsIntersectionGuard(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hookWith(t, "session-end", "claude-code", `{"session_id":"cit1","cwd":"`+proj+`"}`)
+	hookWith(t, "session-end", "claude-code", `{"session_id":"cit1","cwd":"`+js(proj)+`"}`)
 
 	var cited282 int
 	if err := st.QueryRow(`SELECT cited FROM memory_usage_events
@@ -116,7 +116,7 @@ func TestRecordCitationsGracefulWithoutScanner(t *testing.T) {
 	proj := t.TempDir()
 	enableMemoryForTest(t)
 
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"cit2","cwd":"`+proj+`"}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"cit2","cwd":"`+js(proj)+`"}`)
 
 	st := openTestStore(t)
 	var sessionID, projectID int64
@@ -128,7 +128,7 @@ func TestRecordCitationsGracefulWithoutScanner(t *testing.T) {
 		t.Fatalf("seed retrieval: %v", err)
 	}
 
-	hookWith(t, "session-end", "gemini-cli", `{"session_id":"cit2","cwd":"`+proj+`"}`)
+	hookWith(t, "session-end", "gemini-cli", `{"session_id":"cit2","cwd":"`+js(proj)+`"}`)
 
 	var cited int
 	if err := st.QueryRow(`SELECT cited FROM memory_usage_events WHERE session_id = ? AND memory_id = 5`, sessionID).Scan(&cited); err != nil {

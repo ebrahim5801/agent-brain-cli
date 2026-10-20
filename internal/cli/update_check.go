@@ -53,7 +53,7 @@ func maybeCheckForUpdate() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	res, err := update.Check(ctx, &http.Client{Timeout: 2 * time.Second}, cfg.Server(), version.Version)
+	res, err := update.Check(ctx, &http.Client{Timeout: 2 * time.Second}, updateSource(cfg), version.Version)
 	if err != nil {
 		return
 	}

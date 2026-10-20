@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/ebrahim5801/agent-brain-cli/internal/fsutil"
 )
 
 // Load reads a JSON-object settings file. A missing file yields an empty root
@@ -70,7 +72,7 @@ func WriteAtomic(path string, root map[string]any) error {
 	if err := os.WriteFile(tmp, data, perm); err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	return fsutil.Rename(tmp, path)
 }
 
 // WriteIfChanged applies mutate and writes only when the normalized content

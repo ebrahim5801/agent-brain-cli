@@ -110,6 +110,11 @@ sessions, so they re-read the same files and re-ask the same questions. agent-br
 gives them an MCP server with two tools — `memory_search` and `memory_save` —
 plus a session-start hook that injects the most relevant entries automatically.
 
+Personal memory is free and needs no account: it is stored only on this machine.
+Turn it on with `agent-brain memory enable` (it asks for your consent once;
+`--yes` accepts it without the prompt) and off with `agent-brain memory disable
+--all`. Sharing memory with a team is the part that needs an organization plan.
+
 `agent-brain memory list` shows 50 entries at a time, active first and newest
 first. Page with `--limit N` and `--offset N`, filter before paging with `--kind`,
 `--priority` or `--critical`, and use `--limit 0` to list everything. `--all`
