@@ -447,7 +447,8 @@ func (s *Store) DeferCapture(id string, b SessionBinding, generation int64, reas
 	// A batch nobody has begun can be deferred directly, so an agent can always
 	// acknowledge a capture request it cannot carry out.
 	unbegun := state == "pending" && executor == ""
-	if !(unbegun || state == "in_progress" && executor == b.Handle) || gen != generation {
+	owned := state == "in_progress" && executor == b.Handle
+	if (!unbegun && !owned) || gen != generation {
 		return CaptureBatch{}, ErrCaptureConflict
 	}
 	next := ""
