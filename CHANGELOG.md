@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.7 - 2026-10-20
+
+### Changed
+
+- Personal memory is free and needs no account. `agent-brain memory enable` no longer requires `agent-brain login` or a Pro plan: it asks for the one-time consent and turns memory on. Memories stay in the local database and never leave the machine, as before. Team memory, sharing and cloud sync still need a signed-in account and, for team memory, membership of a paying team's project.
+- The memory tools' error messages no longer mention Pro or a paused entitlement. When memory is off, they say to run `agent-brain memory enable`. On a team project whose team memory is off, they also point to personal memory.
+- `agent-brain status` shows personal memory as `off` or `active`. It no longer contacts the server to check a plan before showing it.
+
 ## 0.5.6 - 2026-10-16
 
 ### Fixed

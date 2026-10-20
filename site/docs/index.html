@@ -52,7 +52,7 @@
       <li><a href="#install">Install</a></li>
       <li><a href="#verify">Verify</a></li>
       <li><a href="#stats">Stats</a></li>
-      <li><a href="#memory">Memory (Pro)</a></li>
+      <li><a href="#memory">Memory</a></li>
       <li><a href="#cloud">Cloud dashboard and team memory</a></li>
       <li><a href="#storage">Storage backends</a></li>
       <li><a href="#updating">Updating</a></li>
@@ -97,7 +97,7 @@
     <table>
       <thead><tr><th scope="col">Variable</th><th scope="col">Effect</th></tr></thead>
       <tbody>
-        <tr><td><code class="il">AGENT_BRAIN_VERSION=0.5.6</code></td><td>Pins a version instead of the latest.</td></tr>
+        <tr><td><code class="il">AGENT_BRAIN_VERSION=0.5.7</code></td><td>Pins a version instead of the latest.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_BIN_DIR=DIR</code></td><td>Picks the install folder.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_NO_INTEGRATE=1</code></td><td>Installs the binary only. Skips <code class="il">agent-brain install</code>.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_YES=1</code></td><td>Answers yes to prompts.</td></tr>
@@ -173,9 +173,9 @@ agent-brain install</code></pre>
 
 <!-- ============================== MEMORY ============================== -->
 <section id="memory" aria-labelledby="memory-title">
-  <p class="eyebrow docs-eyebrow">Pro</p>
-  <h2 id="memory-title">Memory (Pro)</h2>
-  <p>Assistants forget everything between sessions. agent-brain gives them an MCP server with two tools, <code class="il">memory_search</code> and <code class="il">memory_save</code>, plus a session-start hook that injects the most relevant entries. Memory needs a Pro account (<code class="il">agent-brain login</code>) or membership in a paying team's project.</p>
+  <p class="eyebrow docs-eyebrow">Free</p>
+  <h2 id="memory-title">Memory</h2>
+  <p>Assistants forget everything between sessions. agent-brain gives them an MCP server with two tools, <code class="il">memory_search</code> and <code class="il">memory_save</code>, plus a session-start hook that injects the most relevant entries. Personal memory is free and local: it needs no account, only your consent through <code class="il">agent-brain memory enable</code>. Team memory needs membership in a paying team's project.</p>
   <p>Entries are typed as <code class="il">decision</code>, <code class="il">convention</code>, <code class="il">task_state</code> or <code class="il">fact</code>. Each one records the git state it was captured at. Ranking flags stale entries rather than trusting them silently.</p>
 
   <h3>Turn memory on or off</h3>
@@ -328,7 +328,7 @@ agent-brain uninstall --purge-data   # also removes the local data</code></pre>
     </details>
     <details class="faq-item">
       <summary>Do I need an account?</summary>
-      <p>No, for collection and <code class="il">agent-brain stats</code>. Memory needs a Pro account or team membership, and the cloud dashboard is optional.</p>
+      <p>No. Collection, <code class="il">agent-brain stats</code> and personal memory need no account. Team memory needs membership of a paying team's project, and the cloud dashboard is optional.</p>
     </details>
     <details class="faq-item">
       <summary>Does it slow my assistant down?</summary>

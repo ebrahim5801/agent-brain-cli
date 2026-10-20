@@ -53,7 +53,7 @@
       <p class="eyebrow">Local stats and memory for AI coding assistants</p>
       <h1>See what your AI assistants really cost, and let them remember</h1>
       <p class="lede">agent-brain runs on your machine. It records sessions, tokens and cost across your coding assistants, and gives them project memory they can search and save. Nothing leaves your machine unless you link a project and consent.</p>
-      <p class="latest-badge"><span class="latest-badge-version" data-latest-version>v0.5.6</span> <span aria-hidden="true">&middot;</span> <a href="#changelog">What's new</a> <span aria-hidden="true">&middot;</span> <a href="/docs/#updating">Updating</a></p>
+      <p class="latest-badge"><span class="latest-badge-version" data-latest-version>v0.5.7</span> <span aria-hidden="true">&middot;</span> <a href="#changelog">What's new</a> <span aria-hidden="true">&middot;</span> <a href="/docs/#updating">Updating</a></p>
 
       <div class="tabs" id="install-tabs">
         <div role="tablist" aria-label="Operating system">
@@ -113,8 +113,8 @@
       </article>
       <article class="feature-card">
         <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3a3 3 0 0 0-3 3v1a3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3zM15 3a3 3 0 0 1 3 3v1a3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-3 3 3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z"/></svg></span>
-        <h3>Memory (Pro)</h3>
-        <p>Assistants get <code class="il">memory_search</code> and <code class="il">memory_save</code> tools over MCP, plus project memory injected at session start. Entries are typed as decisions, conventions, task state or facts.</p>
+        <h3>Memory</h3>
+        <p>Assistants get <code class="il">memory_search</code> and <code class="il">memory_save</code> tools over MCP, plus project memory injected at session start. Entries are typed as decisions, conventions, task state or facts. Free, local, no account: turn it on with <code class="il">agent-brain memory enable</code>.</p>
       </article>
       <article class="feature-card">
         <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
@@ -183,25 +183,25 @@
     <div class="section-head">
       <p class="eyebrow">Free vs Pro</p>
       <h2 id="plans-title">What is free, and what needs an account</h2>
-      <p>The local tool is free and needs no account. Memory needs Pro, and the cloud dashboard is optional.</p>
+      <p>The local tool, including personal memory, is free and needs no account. The cloud dashboard and team memory are optional.</p>
     </div>
     <div class="plan-grid">
       <article class="plan-card">
         <span class="plan-tag">Free</span>
-        <h3>Local collection and stats</h3>
+        <h3>Local collection, stats and memory</h3>
         <ul>
           <li>Session capture for every supported assistant</li>
           <li><code class="il">agent-brain stats</code> and <code class="il">agent-brain status</code></li>
+          <li>Personal memory: <code class="il">memory_search</code>, <code class="il">memory_save</code> and session-start memory, after <code class="il">agent-brain memory enable</code></li>
           <li>Local, offline, no account</li>
         </ul>
       </article>
       <article class="plan-card">
         <span class="plan-tag">Pro</span>
-        <h3>Memory, and the optional cloud dashboard</h3>
+        <h3>The optional cloud: dashboard and team memory</h3>
         <ul>
-          <li>Memory tools (<code class="il">memory_search</code>, <code class="il">memory_save</code>) and session-start memory injection</li>
-          <li>Available with a Pro account (<code class="il">agent-brain login</code>) or through membership of a paying team's project</li>
-          <li>The cloud dashboard is optional: <code class="il">agent-brain login</code>, then <code class="il">agent-brain link &lt;project-key&gt;</code>, then consent</li>
+          <li>Team memory, shared through membership of a paying team's project</li>
+          <li>The cloud dashboard: <code class="il">agent-brain login</code>, then <code class="il">agent-brain link &lt;project-key&gt;</code>, then consent</li>
         </ul>
       </article>
     </div>
@@ -220,7 +220,7 @@
       </details>
       <details class="faq-item">
         <summary>Do I need an account?</summary>
-        <p>No. Collection, <code class="il">agent-brain stats</code> and <code class="il">agent-brain status</code> are local and need no account. Memory needs a Pro account or team membership, and the cloud dashboard is optional.</p>
+        <p>No. Collection, <code class="il">agent-brain stats</code>, <code class="il">agent-brain status</code> and personal memory are local and need no account. Team memory needs membership of a paying team's project, and the cloud dashboard is optional.</p>
       </details>
       <details class="faq-item">
         <summary>Does it slow my assistant down?</summary>
@@ -251,21 +251,29 @@
 
     <div class="release-card">
       <div class="release-head">
-        <span class="release-version">v0.5.6</span>
-        <span class="release-date">October 16, 2026</span>
+        <span class="release-version">v0.5.7</span>
+        <span class="release-date">October 20, 2026</span>
       </div>
-      <p>Memory capture keeps working when the assistant changes folders.</p>
+      <p>Personal memory is free.</p>
       <ul class="release-list">
-        <li>A Claude Code session keeps one memory handle when its shell changes folder. Before, each <code class="il">cd</code> into a subfolder gave it a new handle that the memory tools then rejected.</li>
-        <li>The end-of-reply memory request is not repeated while an earlier one is still unanswered, so an assistant that cannot act on it is no longer blocked at every reply.</li>
-        <li><code class="il">memory_capture_defer</code> can acknowledge a request that was never begun, and <code class="il">memory_capture_status</code> returns a result Claude Code accepts.</li>
-        <li><code class="il">usage_stats</code> counts all of a session's tokens, including sessions an earlier version split by folder.</li>
-        <li>Saved memories hide credential keys with a prefix, such as <code class="il">memory_token</code> or <code class="il">refresh_token</code>.</li>
+        <li><code class="il">agent-brain memory enable</code> turns memory on with no account or plan: one consent step, and memories stay on your machine.</li>
+        <li>Team memory, sharing and the cloud dashboard still need a signed-in account.</li>
+        <li><code class="il">agent-brain status</code> shows memory as off or active, without contacting the server.</li>
       </ul>
     </div>
 
     <h3 class="version-history-heading">Version history</h3>
     <div class="version-history">
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.6</span><span class="release-date">October 16, 2026</span><span class="version-summary">Memory capture keeps working when the assistant changes folders.</span></summary>
+        <ul class="release-list">
+          <li>A Claude Code session keeps one memory handle when its shell changes folder. Before, each <code class="il">cd</code> into a subfolder gave it a new handle that the memory tools then rejected.</li>
+          <li>The end-of-reply memory request is not repeated while an earlier one is still unanswered, so an assistant that cannot act on it is no longer blocked at every reply.</li>
+          <li><code class="il">memory_capture_defer</code> can acknowledge a request that was never begun, and <code class="il">memory_capture_status</code> returns a result Claude Code accepts.</li>
+          <li><code class="il">usage_stats</code> counts all of a session's tokens, including sessions an earlier version split by folder.</li>
+          <li>Saved memories hide credential keys with a prefix, such as <code class="il">memory_token</code> or <code class="il">refresh_token</code>.</li>
+        </ul>
+      </details>
       <details class="version-item">
         <summary><span class="release-version">v0.5.5</span><span class="release-date">October 15, 2026</span><span class="version-summary">agent-brain works on Windows.</span></summary>
         <ul class="release-list">

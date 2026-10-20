@@ -13,8 +13,8 @@ import (
 )
 
 // printMemoryStatus adds the memory line to `agent-brain status`
-// (contracts/cli-memory.md). It refreshes the entitlement best-effort with a
-// short timeout; a stale cache is shown with its age rather than blocking.
+// (contracts/cli-memory.md). For a signed-in account it still refreshes the
+// cached entitlement best-effort with a short timeout, for the cloud features.
 func printMemoryStatus(st *store.Store) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -27,19 +27,10 @@ func printMemoryStatus(st *store.Store) {
 		}
 	}
 
-	now := time.Now()
-	var state string
-	switch {
-	case !cfg.MemoryConsented() && entitlement.Entitled(cfg, now):
-		state = "off — enable with `agent-brain memory enable`"
-	case !cfg.MemoryConsented():
-		state = "off"
-	case entitlement.Paused(cfg, now):
-		state = fmt.Sprintf("paused (entitlement last verified %s, > 7 days ago) — reconnect to re-verify", cfg.Entitlement.VerifiedAt)
-	case !entitlement.Entitled(cfg, now):
-		state = "pro required — upgrade to activate"
-	default:
-		state = fmt.Sprintf("active (pro verified %s)", cfg.Entitlement.VerifiedAt)
+	// Personal memory is local and free: consent alone turns it on.
+	state := "off — enable with `agent-brain memory enable`"
+	if cfg.MemoryConsented() {
+		state = "active"
 	}
 
 	projectID, identity, found, err := currentProject(st)
