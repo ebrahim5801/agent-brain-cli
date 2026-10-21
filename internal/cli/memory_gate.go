@@ -29,7 +29,7 @@ func newMemoryEnableCmd() *cobra.Command {
 	var project, yes bool
 	cmd := &cobra.Command{
 		Use:   "enable",
-		Short: "Turn on personal memory (Pro), or re-enable it for this project",
+		Short: "Turn on personal memory (free, stays on this machine), or re-enable it for this project",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if project {
 				return setProjectMemoryDisabled(false)

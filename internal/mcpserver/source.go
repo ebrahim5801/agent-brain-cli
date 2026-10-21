@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ebrahim5801/agent-brain-cli/internal/assistant"
 	"github.com/ebrahim5801/agent-brain-cli/internal/redact"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type sourceIn struct {
@@ -22,7 +22,7 @@ type sourceOut struct {
 }
 
 func (s *Server) addSourceTool() {
-	mcp.AddTool(s.mcp, &mcp.Tool{Name: "memory_source_reference", Description: "Resolve a relevant original user message locally to a stable evidence reference/digest and a redacted excerpt. Does not store full messages/transcripts. Provenance is not proof that a paraphrased decision is true."}, s.sourceReference)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "memory_source_reference", Annotations: readOnlyTool(), Description: "Resolve a relevant original user message locally to a stable evidence reference/digest and a redacted excerpt. Does not store full messages/transcripts. Provenance is not proof that a paraphrased decision is true."}, s.sourceReference)
 }
 func (s *Server) sourceReference(ctx context.Context, req *mcp.CallToolRequest, in sourceIn) (*mcp.CallToolResult, any, error) {
 	pid, _, err := s.gate()
