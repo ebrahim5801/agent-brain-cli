@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.9 - 2026-10-21
+
+### Security
+
+- Built with Go 1.26.10, which fixes GO-2026-6809: crypto/x509 now distrusts compromised intermediate certificates. agent-brain checks certificates when it updates itself and when it talks to the cloud server. Every earlier release was built with Go 1.26.9. CI now uses Go 1.26.10 too.
+
 ## 0.5.8 - 2026-10-21
 
 ### Added
