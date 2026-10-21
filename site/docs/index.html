@@ -97,7 +97,7 @@
     <table>
       <thead><tr><th scope="col">Variable</th><th scope="col">Effect</th></tr></thead>
       <tbody>
-        <tr><td><code class="il">AGENT_BRAIN_VERSION=0.5.9</code></td><td>Pins a version instead of the latest.</td></tr>
+        <tr><td><code class="il">AGENT_BRAIN_VERSION=0.5.10</code></td><td>Pins a version instead of the latest.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_BIN_DIR=DIR</code></td><td>Picks the install folder.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_NO_INTEGRATE=1</code></td><td>Installs the binary only. Skips <code class="il">agent-brain install</code>.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_YES=1</code></td><td>Answers yes to prompts.</td></tr>
@@ -190,6 +190,8 @@ agent-brain install</code></pre>
   <div class="cmd-ref">
     <div class="cmd-ref-item"><code class="il">agent-brain memory list</code><p>Lists this project's entries, active first and newest first: 50 per page by default. Use <code class="il">--limit N</code> and <code class="il">--offset N</code> to page, or <code class="il">--limit 0</code> for all; <code class="il">--kind</code>, <code class="il">--priority</code> and <code class="il">--critical</code> filter before paging. <code class="il">--all</code> includes superseded and deleted entries.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain memory show ID</code><p>Shows one entry in full.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory export</code><p>Writes this project's memories as Markdown to read or keep. <code class="il">--format json</code> writes the file <code class="il">memory import</code> reads, to move them to another machine or a colleague; <code class="il">--out FILE</code> writes a file only you can read, and <code class="il">--all</code> adds retired entries.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory import FILE</code><p>Adds a JSON export's entries to the project in the current folder. It shows what it will add and asks first; <code class="il">--dry-run</code> shows the summary only and <code class="il">--yes</code> imports without asking. The file must come from the same project (same git remote); <code class="il">--into-current-project</code> overrides that for a project without a remote. Entries already present are skipped, imported entries start unverified, and an import never retires an entry already on the machine.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain memory edit ID</code><p>Edits an entry's content in <code class="il">$EDITOR</code>, or pass <code class="il">--content</code>.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain memory priority ID critical|normal|background</code><p>Reclassifies how hard an entry competes for the session-start memory budget.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain memory delete ID</code><p>Permanently deletes an entry.</p></div>

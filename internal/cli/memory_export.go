@@ -1,17 +1,21 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/ebrahim5801/agent-brain-cli/internal/attribution"
 	"github.com/ebrahim5801/agent-brain-cli/internal/fsutil"
 	"github.com/ebrahim5801/agent-brain-cli/internal/memory"
 	"github.com/ebrahim5801/agent-brain-cli/internal/redact"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
+	"github.com/ebrahim5801/agent-brain-cli/internal/version"
 )
 
 var exportHeadings = map[string]string{
@@ -22,12 +26,16 @@ var exportHeadings = map[string]string{
 }
 
 func newMemoryExportCmd() *cobra.Command {
-	var out string
+	var out, format string
 	var all bool
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "Write this project's memories as Markdown (stdout, or --out FILE)",
+		Short: "Write this project's memories as Markdown, or as JSON for `memory import` (stdout, or --out FILE)",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if format != "markdown" && format != "json" {
+				return fmt.Errorf("--format must be markdown or json")
+			}
 			st, err := store.Open()
 			if err != nil {
 				return err
@@ -37,9 +45,12 @@ func newMemoryExportCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			dir, _ := os.Getwd()
+			if format == "json" {
+				return exportJSON(st, projectID, dir, all, out)
+			}
 			var entries []memory.Ranked
 			if found {
-				dir, _ := os.Getwd()
 				if entries, err = memory.List(st, projectID, dir, all, cliGitBudget); err != nil {
 					return err
 				}
@@ -57,8 +68,40 @@ func newMemoryExportCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&out, "out", "", "write to this file instead of stdout")
-	cmd.Flags().BoolVar(&all, "all", false, "include superseded and deleted entries")
+	cmd.Flags().StringVar(&format, "format", "markdown", "markdown to read, or json to move memories with `agent-brain memory import`")
+	cmd.Flags().BoolVar(&all, "all", false, "include superseded, completed and deleted entries")
 	return cmd
+}
+
+// exportJSON writes the file `memory import` reads. Its notes go to stderr, so
+// stdout stays a clean file when no --out is given.
+func exportJSON(st *store.Store, projectID int64, dir string, all bool, out string) error {
+	f, notes, err := memory.BuildExport(st, projectID, attribution.Resolve(dir), dir, all, "agent-brain "+version.Version, time.Now())
+	if err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(f, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	if out == "" {
+		if _, err := os.Stdout.Write(data); err != nil {
+			return err
+		}
+	} else {
+		if err := writePrivateFile(out, data); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "Wrote %d entries and %d links to %s. Import them with `agent-brain memory import %s` inside the project on the other machine.\n", len(f.Entries), len(f.Relations), out, filepath.Base(out))
+	}
+	if notes.Shared > 0 {
+		fmt.Fprintf(os.Stderr, "Left out %d entries shared with your team: team sync brings them to the other machine.\n", notes.Shared)
+	}
+	if notes.OtherCheckouts > 0 {
+		fmt.Fprintf(os.Stderr, "Left out %d entries that belong to other checkouts of this project; export inside those checkouts to move them.\n", notes.OtherCheckouts)
+	}
+	return nil
 }
 
 // writePrivateFile replaces path with a file only its owner can read, since

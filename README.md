@@ -123,6 +123,31 @@ project's memories as Markdown, one section per kind (`--out FILE` writes a file
 only you can read; `--all` adds retired entries). The export is a snapshot to
 read or keep; change entries with `agent-brain memory edit <id>`.
 
+To move a project's memories to another machine, or hand them to a colleague
+working on the same project, export them as JSON and import the file inside the
+project on the other side:
+
+```sh
+agent-brain memory export --format json --out project.memory.json
+agent-brain memory import project.memory.json
+```
+
+The import shows what it will add and asks before writing; `--dry-run` shows the
+summary only, and `--yes` imports without asking (an assistant running the
+command needs it, since it has no terminal to answer in). It checks the file
+came from the same project: the git remote must match, and a project without a
+remote needs `--into-current-project`, because its folder differs between
+machines. Entries already present are skipped, so importing a file twice adds
+nothing. The file carries the memory text, kind, priority, rationale, git state
+and the links between entries, but nothing tied to the exporting machine: no
+sessions, transcripts, evidence or paths. Imported entries start unverified,
+and an import never retires an entry that was already on the machine; a
+replacement of one waits for review instead. Entries shared with a team are left
+out, since team sync brings them. Rationales, branch- or checkout-scoped entries,
+completed tasks and links need memory V2 on the importing machine
+([docs/memory-v2.md](docs/memory-v2.md)); without it the import says what it
+could not keep.
+
 Entries are typed (`decision`, `convention`, `task_state`, `fact`), carry the
 git state they were captured at, and are ranked so stale ones are flagged rather
 than silently trusted. The session-start pack holds whole entries only and
