@@ -168,7 +168,7 @@ func TestPackLeavesOutRoutineLabels(t *testing.T) {
 			}
 			plain := upkeepSave(t, st, memory.SaveInput{ProjectID: pid, SessionHandle: b.Handle, Dir: dir, Content: "The cache lives in Redis", Kind: "fact", Origin: "auto"})
 			verified := upkeepSave(t, st, memory.SaveInput{ProjectID: pid, SessionHandle: b.Handle, Dir: dir, Content: "invoices are stored in UTC", Kind: "fact", Origin: "explicit", Evidence: []memory.EvidenceInput{ev}})
-			scoped := upkeepSave(t, st, memory.SaveInput{ProjectID: pid, SessionHandle: b.Handle, Dir: dir, Content: "Feature flags default off here", Kind: "convention", Origin: "auto", Scope: "checkout:" + dir})
+			scoped := upkeepSave(t, st, memory.SaveInput{ProjectID: pid, SessionHandle: b.Handle, Dir: dir, Content: "Feature flags default off here", Kind: "convention", Origin: "auto", Scope: "checkout:" + store.CheckoutIdentity(dir)})
 			text := packText(t, st, pid, dir, time.Now())
 			for _, want := range []string{
 				fmt.Sprintf(`[#%d] (fact, auto) "The cache lives in Redis"`, plain.ID),
