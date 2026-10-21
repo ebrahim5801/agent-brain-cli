@@ -26,7 +26,10 @@ Historical memory rows are neither rewritten nor backfilled. Seven additive
 tables store bindings, capture batches, write receipts, new-record details,
 evidence, relationships and state events. Accepted transitions affect the
 current view while preserving the original record. Unknown evidence does not
-silently supersede a decision or complete a task.
+silently supersede a decision or complete a task. One exception needs no
+evidence: a session replacing an automatic task note that it saved itself with
+a newer task note, in the same scope, is accepted at once. It is limited to task
+notes because handles appear in history and so do not prove who is asking.
 
 ## Sessions and capture
 
@@ -42,6 +45,10 @@ not persistence acknowledgments. Declare stable labels with
 `memory_capture_begin`, save each using its operation ID and generation, then
 call `memory_capture_complete` only after every item persisted. An empty manifest
 requires explicit `no_durable_changes`; unavailable context remains deferred.
+The session a request was issued to can answer `no_durable_changes` in one
+`memory_capture_complete` call, without `memory_capture_begin`. The periodic
+checkpoint needs at least 5 tool calls since the last request, and its 5-minute
+wait doubles after each consecutive empty answer, up to an hour.
 Identical retries return durable receipts; changed payloads cannot reuse an ID.
 
 ## Evidence and retrieval

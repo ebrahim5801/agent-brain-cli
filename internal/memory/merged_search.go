@@ -145,7 +145,7 @@ func SearchMerged(st *store.Store, projectID int64, dir, query string, filter Fi
 	}
 	out := make([]SearchResult, 0, len(ranked))
 	for _, it := range ranked {
-		r := SearchResult{Text: renderItem(it.item), Score: it.item.score, Explanation: explanations[it.ref]}
+		r := SearchResult{Text: renderItem(it.item, false), Score: it.item.score, Explanation: explanations[it.ref]}
 		if it.item.isTeam {
 			r.TeamUID = it.item.uid
 		} else {

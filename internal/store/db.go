@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -83,13 +84,17 @@ func OpenAt(path string) (*Store, error) {
 	} else if !os.IsExist(err) {
 		return nil, err
 	}
-	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(FULL)&_pragma=foreign_keys(1)&_txlock=immediate", path)
+	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)&_pragma=synchronous(FULL)&_pragma=foreign_keys(1)&_txlock=immediate", path)
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
 	// SQLite serializes writers; a single connection avoids in-process lock churn.
 	db.SetMaxOpenConns(1)
+	if err := ensureWAL(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	s := &Store{DB: db, Backend: BackendSQLite, Path: path}
 	if err := migrate(s.DB, s.Backend); err != nil {
 		db.Close()
@@ -102,6 +107,41 @@ func OpenAt(path string) (*Store, error) {
 	}
 	s.MemoryV2 = v >= 16
 	return s, nil
+}
+
+// ensureWAL puts the database in WAL mode. The mode is stored in the file, so
+// it is set here once rather than as a per-connection pragma: switching modes
+// needs an exclusive lock, and SQLite answers SQLITE_BUSY at once instead of
+// waiting out busy_timeout when another process holds the database, which
+// several hooks starting together do. Until the switch succeeds the store
+// works in rollback-journal mode, so a database that stays busy is not an error.
+func ensureWAL(db *sql.DB) error {
+	for attempt := 0; ; attempt++ {
+		var mode string
+		err := db.QueryRow(`PRAGMA journal_mode`).Scan(&mode)
+		if err == nil && strings.EqualFold(mode, "wal") {
+			return nil
+		}
+		if err == nil {
+			err = db.QueryRow(`PRAGMA journal_mode=WAL`).Scan(&mode)
+			if err == nil && strings.EqualFold(mode, "wal") {
+				return nil
+			}
+		}
+		if err != nil && !isBusy(err) {
+			return err
+		}
+		if attempt == 20 {
+			return nil
+		}
+		time.Sleep(time.Duration(10*(attempt+1)) * time.Millisecond)
+	}
+}
+
+// isBusy reports SQLITE_BUSY, including its extended codes.
+func isBusy(err error) bool {
+	var coded interface{ Code() int }
+	return errors.As(err, &coded) && coded.Code()&0xff == 5
 }
 
 func (s *Store) Close() error {
