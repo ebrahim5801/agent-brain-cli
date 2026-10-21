@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.8 - 2026-10-21
+
+### Added
+
+- `agent-brain memory export` writes the project's memories as Markdown, one section per kind. `--out FILE` writes a file only you can read, and `--all` adds superseded and deleted entries.
+- Every MCP tool declares whether it only reads (`readOnlyHint`). None is marked destructive: lifecycle changes are appended, never deleted.
+
+### Changed
+
+- Answering a memory request with "nothing to save" takes one call: `memory_capture_complete` with the batch ID and `no_durable_changes`, without `memory_capture_begin`. Only the session the request was issued to can do this.
+- The periodic memory request needs at least 5 tool calls since the last request, and its 5-minute wait doubles after each consecutive "nothing to save" answer, up to an hour. A save resets it.
+- When a session replaces an automatic task note it saved itself with a newer task note, in the same scope, the replacement is accepted at once instead of waiting for review. Other kinds of entries still need review, because session handles are visible in history and so cannot prove which session is asking.
+- The session-start pack no longer injects an automatic entry whose replacement is waiting for review (the replacement is injected instead), or a task note last written more than 30 days ago unless it is critical. Both stay searchable.
+- The pack is shorter: it leaves out the unverified default, project-wide or legacy scope, revision, unknown git state and the completeness note. The header says entries are unverified unless labeled. `memory_search` and `memory_list` still show every label.
+- The pack holds whole entries only. An entry too long for the budget is skipped, so smaller ones below it still fit; only when nothing fits whole does the top entry go in as an excerpt.
+
+### Fixed
+
+- `memory_save` accepts a `memory_source_reference` result unchanged as evidence. Its `status` field was rejected before. The tool description now says what an evidence item looks like.
+
 ## 0.5.7 - 2026-10-20
 
 ### Changed

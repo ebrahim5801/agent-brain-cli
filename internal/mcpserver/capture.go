@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type captureIn struct {
@@ -19,10 +19,10 @@ type captureIn struct {
 }
 
 func (s *Server) addCaptureTools() {
-	mcp.AddTool(s.mcp, &mcp.Tool{Name: "memory_capture_defer", Description: "Release a capture lease as needs_context or retry_wait without losing persisted receipts. Do not fabricate unavailable source context."}, s.captureDefer)
-	mcp.AddTool(s.mcp, &mcp.Tool{Name: "memory_capture_begin", Description: "Begin/resume acknowledged capture. Declare stable item labels, then save each using returned operation_id/batch_id/generation and this session_handle. Retry the same manifest; inspect status after lost replies."}, s.captureBegin)
-	mcp.AddTool(s.mcp, &mcp.Tool{Name: "memory_capture_complete", Description: "Acknowledge capture only after every declared item is persisted; explicitly acknowledge an empty manifest with no_durable_changes. A summary alone is not capture completion."}, s.captureComplete)
-	mcp.AddTool(s.mcp, &mcp.Tool{Name: "memory_capture_status", Description: "Inspect this project's pending capture work and durable receipts without assuming that a hook request succeeded. Missing context stays pending and is not fabricated."}, s.captureStatus)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "memory_capture_defer", Annotations: appendingTool(), Description: "Release a capture lease as needs_context or retry_wait without losing persisted receipts. Do not fabricate unavailable source context."}, s.captureDefer)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "memory_capture_begin", Annotations: appendingTool(), Description: "Begin/resume acknowledged capture. Declare stable item labels, then save each using returned operation_id/batch_id/generation and this session_handle. Retry the same manifest; inspect status after lost replies."}, s.captureBegin)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "memory_capture_complete", Annotations: appendingTool(), Description: "Acknowledge capture only after every declared item is persisted. When nothing durable was learned, call it once with batch_id and no_durable_changes: true; memory_capture_begin is not needed first. A summary alone is not capture completion."}, s.captureComplete)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "memory_capture_status", Annotations: readOnlyTool(), Description: "Inspect this project's pending capture work and durable receipts without assuming that a hook request succeeded. Missing context stays pending and is not fabricated."}, s.captureStatus)
 }
 
 func (s *Server) captureBinding(in captureIn) (store.SessionBinding, error) {

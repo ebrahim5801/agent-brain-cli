@@ -118,18 +118,30 @@ Turn it on with `agent-brain memory enable` (it asks for your consent once;
 `agent-brain memory list` shows 50 entries at a time, active first and newest
 first. Page with `--limit N` and `--offset N`, filter before paging with `--kind`,
 `--priority` or `--critical`, and use `--limit 0` to list everything. `--all`
-includes superseded and deleted entries.
+includes superseded and deleted entries. `agent-brain memory export` writes the
+project's memories as Markdown, one section per kind (`--out FILE` writes a file
+only you can read; `--all` adds retired entries). The export is a snapshot to
+read or keep; change entries with `agent-brain memory edit <id>`.
 
 Entries are typed (`decision`, `convention`, `task_state`, `fact`), carry the
 git state they were captured at, and are ranked so stale ones are flagged rather
-than silently trusted.
+than silently trusted. The session-start pack holds whole entries only and
+leaves out routine labels (`memory_search` and `memory_list` show them all). It
+skips a task note a month after it was last written, unless it is critical, and
+an automatic entry whose replacement is waiting for review; both stay
+searchable. When a session updates a task note it saved itself, the newer note
+replaces it at once; other replacements wait for review.
 
 agent-brain asks the assistant to save memory after 10 tool calls of work since
 the last save (not after every reply), at a mid-task checkpoint every 25 tool
 calls, and before the context is compacted. The memory tools' own calls are not
 counted. `agent-brain memory capture` shows the settings; `--every N` and
 `--checkpoint N` change them (0 turns that trigger off, `--every 1` saves after
-every reply that used a tool), and `--reset` restores the defaults.
+every reply that used a tool), and `--reset` restores the defaults. During long
+stretches below those counts it also asks every 5 minutes, once at least 5 tool
+calls have run; each "nothing to save" answer doubles that wait, up to an hour.
+Answering "nothing to save" takes one call: `memory_capture_complete` with
+`no_durable_changes` and the request's batch ID.
 
 ## Privacy
 

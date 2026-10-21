@@ -35,6 +35,23 @@ type Server struct {
 	logger *diag.Logger
 }
 
+// Tool hints let clients tell reading tools from writing ones. No tool deletes
+// anything (lifecycle changes are appended), so none is destructive. Only
+// memory_save can reach beyond this machine, through team sync.
+var falseHint = false
+
+func readOnlyTool() *mcp.ToolAnnotations {
+	return &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &falseHint}
+}
+
+func appendingTool() *mcp.ToolAnnotations {
+	return &mcp.ToolAnnotations{DestructiveHint: &falseHint, OpenWorldHint: &falseHint}
+}
+
+func savingTool() *mcp.ToolAnnotations {
+	return &mcp.ToolAnnotations{DestructiveHint: &falseHint}
+}
+
 // New builds the MCP server for the project enclosing dir. st may be nil;
 // tools then answer "temporarily unavailable".
 func New(st *store.Store, dir, version string) *Server {
@@ -42,28 +59,35 @@ func New(st *store.Store, dir, version string) *Server {
 	s.mcp = mcp.NewServer(&mcp.Implementation{Name: serverName, Version: version}, nil)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "memory_save",
+		Name:        "memory_save",
+		Annotations: savingTool(),
 		Description: "Persist one durable memory for the current project (a decision, convention, " +
 			"task state, or non-obvious fact). Use origin \"explicit\" when the developer asked for " +
 			"this to be remembered. Pass supersedes with personal [#id] entry IDs this memory replaces. " +
 			"To replace or contradict a team entry shown in the pack, pass its [team#...] handle to " +
 			"supersedes_team; the server records a supersede for your own entry or a contradiction for a " +
-			"teammate's, and both are surfaced to the team.",
+			"teammate's, and both are surfaced to the team. Evidence is optional: each item is an object " +
+			"{type, reference, digest, excerpt}. For something the user said, pass the result of " +
+			"memory_source_reference unchanged; for a file, use type \"artifact\", its repository-relative " +
+			"path and the SHA-256 of its bytes. Never pass plain strings.",
 	}, s.save)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "memory_search",
+		Name:        "memory_search",
+		Annotations: readOnlyTool(),
 		Description: "Retrieve this project's memories beyond the injected pack. Keyword match over " +
 			"active entries, most relevant first; empty query returns the most relevant entries.",
 	}, s.search)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "memory_list",
+		Annotations: readOnlyTool(),
 		Description: "List this project's memory entries, active first, newest first: 50 per page by default (limit up to 200, offset for the next page; filter by priority or kind). Use it to ground supersedes decisions before memory_save.",
 	}, s.list)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "session_summary",
+		Name:        "session_summary",
+		Annotations: appendingTool(),
 		Description: "Record a 2-3 sentence summary of this session (the goal, what changed, the outcome) " +
 			"on the local session record, so `agent-brain stats --sessions` shows what each session was. " +
 			"Stored on this machine only; never synced.",

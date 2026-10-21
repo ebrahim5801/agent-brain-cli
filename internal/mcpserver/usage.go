@@ -45,8 +45,8 @@ type unavailableUsage struct {
 func (s *Server) addUsageTool() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "usage_stats",
+		Annotations: readOnlyTool(),
 		Description: "Read this machine's token usage: the given session (with its subagent runs), today, and this week. Local only; works without memory.",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, s.usage)
 }
 

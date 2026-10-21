@@ -111,3 +111,66 @@ func TestEmptyCaptureAndExpiredLeaseAreHonest(t *testing.T) {
 		t.Fatalf("empty outcome: %v", err)
 	}
 }
+
+// The session a request was issued to answers "nothing to save" in one call;
+// no other session can close its request that way, and a request that was
+// already begun still needs its own lease.
+func TestNothingToSaveTakesOneCallFromTheRequestedSession(t *testing.T) {
+	for _, backend := range storetest.Both(t) {
+		t.Run(backend.Name, func(t *testing.T) {
+			st := backend.Store
+			if err := st.UpgradeMemoryV2(); err != nil {
+				t.Fatal(err)
+			}
+			dir := t.TempDir()
+			pid, err := st.UpsertProject(store.ProjectIdentity{Kind: "directory", Identity: dir}, store.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			own, err := st.EnsureBoundSession(pid, "claude-code", "own", dir, "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			other, err := st.EnsureBoundSession(pid, "codex", "other", dir, "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			now := time.Now().UTC()
+			batch, err := st.RequestCapture(own, "periodic", 7, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := st.CompleteCapture(batch.ID, other, 0, true, now); err == nil {
+				t.Fatal("another session closed this session's request")
+			}
+			if _, err := st.CompleteCapture(batch.ID, own, 0, false, now); err == nil {
+				t.Fatal("a request never begun was completed as saved")
+			}
+			done, err := st.CompleteCapture(batch.ID, own, 0, true, now)
+			if err != nil || done.State != "no_durable_changes" || done.ExecutorHandle != own.Handle {
+				t.Fatalf("one-call answer: %+v %v", done, err)
+			}
+			again, err := st.CompleteCapture(batch.ID, own, 0, true, now)
+			if err != nil || again.State != "no_durable_changes" {
+				t.Fatalf("repeated answer after a lost reply: %+v %v", again, err)
+			}
+			if _, err := st.BeginCapture(batch.ID, own, []string{"late"}, now); err == nil {
+				t.Fatal("a closed request accepted a new manifest")
+			}
+
+			begun, err := st.RequestCapture(own, "periodic", 9, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if begun, err = st.BeginCapture(begun.ID, own, nil, now); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := st.CompleteCapture(begun.ID, own, 0, true, now); err == nil && begun.Generation != 0 {
+				t.Fatal("a begun request skipped its lease generation")
+			}
+			if done, err := st.CompleteCapture(begun.ID, own, begun.Generation, true, now); err != nil || done.State != "no_durable_changes" {
+				t.Fatalf("begun empty request: %+v %v", done, err)
+			}
+		})
+	}
+}

@@ -53,7 +53,7 @@
       <p class="eyebrow">Local stats and memory for AI coding assistants</p>
       <h1>See what your AI assistants really cost, and let them remember</h1>
       <p class="lede">agent-brain runs on your machine. It records sessions, tokens and cost across your coding assistants, and gives them project memory they can search and save. Nothing leaves your machine unless you link a project and consent.</p>
-      <p class="latest-badge"><span class="latest-badge-version" data-latest-version>v0.5.7</span> <span aria-hidden="true">&middot;</span> <a href="#changelog">What's new</a> <span aria-hidden="true">&middot;</span> <a href="/docs/#updating">Updating</a></p>
+      <p class="latest-badge"><span class="latest-badge-version" data-latest-version>v0.5.8</span> <span aria-hidden="true">&middot;</span> <a href="#changelog">What's new</a> <span aria-hidden="true">&middot;</span> <a href="/docs/#updating">Updating</a></p>
 
       <div class="tabs" id="install-tabs">
         <div role="tablist" aria-label="Operating system">
@@ -251,19 +251,29 @@
 
     <div class="release-card">
       <div class="release-head">
-        <span class="release-version">v0.5.7</span>
-        <span class="release-date">October 20, 2026</span>
+        <span class="release-version">v0.5.8</span>
+        <span class="release-date">October 21, 2026</span>
       </div>
-      <p>Personal memory is free.</p>
+      <p>Memory costs fewer tokens and stays current.</p>
       <ul class="release-list">
-        <li><code class="il">agent-brain memory enable</code> turns memory on with no account or plan: one consent step, and memories stay on your machine.</li>
-        <li>Team memory, sharing and the cloud dashboard still need a signed-in account.</li>
-        <li><code class="il">agent-brain status</code> shows memory as off or active, without contacting the server.</li>
+        <li>"Nothing to save" is one call, and the periodic memory request waits longer each time there was nothing to save.</li>
+        <li>An entry the assistant replaced is no longer injected next to its replacement, and task notes stop being injected after 30 days unless critical.</li>
+        <li>The injected memory is shorter: whole entries only, without routine labels.</li>
+        <li><code class="il">agent-brain memory export</code> writes your memories as Markdown.</li>
+        <li><code class="il">memory_save</code> accepts a <code class="il">memory_source_reference</code> result as evidence, and every tool says whether it only reads.</li>
       </ul>
     </div>
 
     <h3 class="version-history-heading">Version history</h3>
     <div class="version-history">
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.7</span><span class="release-date">October 20, 2026</span><span class="version-summary">Personal memory is free.</span></summary>
+        <ul class="release-list">
+          <li><code class="il">agent-brain memory enable</code> turns memory on with no account or plan: one consent step, and memories stay on your machine.</li>
+          <li>Team memory, sharing and the cloud dashboard still need a signed-in account.</li>
+          <li><code class="il">agent-brain status</code> shows memory as off or active, without contacting the server.</li>
+        </ul>
+      </details>
       <details class="version-item">
         <summary><span class="release-version">v0.5.6</span><span class="release-date">October 16, 2026</span><span class="version-summary">Memory capture keeps working when the assistant changes folders.</span></summary>
         <ul class="release-list">
