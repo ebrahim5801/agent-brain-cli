@@ -126,8 +126,11 @@ func init() {
 	}
 }
 
+// memoryV2Version is the schema version the Memory V2 tables record.
+const memoryV2Version = 16
+
 func (s *Store) UpgradeMemoryV2() error {
-	if err := migrateTo(s.DB, s.Backend, 16); err != nil {
+	if err := migrateTo(s.DB, s.Backend, memoryV2Version); err != nil {
 		return err
 	}
 	s.MemoryV2 = true

@@ -62,6 +62,34 @@ func Running() (bool, bool) {
 	}
 }
 
+// Restart restarts the service when it is running, so it picks up the binary
+// now on disk: replacing the file never restarts a process that already has it
+// open. It reports whether a restart was attempted; a service that is not
+// installed or not running is left alone.
+func Restart() (bool, error) {
+	switch runtime.GOOS {
+	case "linux":
+		if running, known := Running(); !known || !running {
+			return false, nil
+		}
+		return true, exec.Command("systemctl", "--user", "restart", serviceName+".service").Run()
+	case "darwin":
+		if running, known := Running(); !known || !running {
+			return false, nil
+		}
+		return true, exec.Command("launchctl", "kickstart", "-k", fmt.Sprintf("gui/%d/dev.agent-brain.sync", os.Getuid())).Run()
+	case "windows":
+		out, err := exec.Command("schtasks", "/Query", "/TN", serviceName, "/FO", "CSV", "/NH").Output()
+		if err != nil || !strings.Contains(string(out), "Running") {
+			return false, nil
+		}
+		_ = exec.Command("schtasks", "/End", "/TN", serviceName).Run()
+		return true, exec.Command("schtasks", "/Run", "/TN", serviceName).Run()
+	default:
+		return false, nil
+	}
+}
+
 func installLaunchd(binPath string) error {
 	home, err := os.UserHomeDir()
 	if err != nil {

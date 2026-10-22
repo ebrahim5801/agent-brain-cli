@@ -152,6 +152,8 @@ func runUpdate(ctx context.Context, checkOnly, force, quiet bool) error {
 		markAutoApplied(res.Latest)
 	}
 	fmt.Printf("Updated agent-brain %s -> %s (%s)\n", current, res.Latest, target)
+	// The service keeps running the replaced binary until restarted.
+	restartDaemonService(quiet)
 	return nil
 }
 

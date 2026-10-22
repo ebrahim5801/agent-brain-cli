@@ -122,6 +122,11 @@ includes superseded and deleted entries. `agent-brain memory export` writes the
 project's memories as Markdown, one section per kind (`--out FILE` writes a file
 only you can read; `--all` adds retired entries). The export is a snapshot to
 read or keep; change entries with `agent-brain memory edit <id>`.
+`--format obsidian --out FOLDER` writes one note per memory, with properties,
+tags and links between entries, plus an index note: open the folder as an
+Obsidian vault to browse memories as a graph. It writes only into a new or
+empty folder, or one an earlier Obsidian export made, and never overwrites a
+note it didn't write.
 
 To move a project's memories to another machine, or hand them to a colleague
 working on the same project, export them as JSON and import the file inside the
@@ -220,4 +225,4 @@ MIT. See [LICENSE](LICENSE). The agent-brain name is covered by
 
 ## Memory V2
 
-Version 0.5.0 adds preserved decision history, acknowledged session capture and recovery, local evidence verification and improved BM25 search. Existing memories stay readable. Activation is explicit after backup and aligned binaries: see [Memory V2](docs/memory-v2.md) and the [upgrade/rollback guide](docs/runbooks/memory-v2-upgrade-rollback.md).
+Version 0.5.0 adds preserved decision history, acknowledged session capture and recovery, local evidence verification and improved BM25 search. Session capture and summaries need it. Since 0.5.11 a new local store starts in this format, and `agent-brain memory enable` upgrades an existing local store; both `enable` and `agent-brain memory upgrade-v2 --apply` first copy a SQLite store to `<store>.pre-v2-<time>.bak` next to it. A shared PostgreSQL store is never upgraded automatically: teammates' older binaries may use it. See [Memory V2](docs/memory-v2.md) and the [upgrade/rollback guide](docs/runbooks/memory-v2-upgrade-rollback.md).

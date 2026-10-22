@@ -24,7 +24,7 @@ the site's source is `site/`.
 ## 2. Build
 
 ```sh
-go run ./packaging/release -version 0.5.10
+go run ./packaging/release -version 0.5.11
 ```
 
 This builds Linux, macOS and Windows binaries for amd64 and arm64 with the
@@ -79,8 +79,8 @@ with `AGENT_BRAIN_VERSION`.
 ```sh
 DOCROOT=/var/www/agentbrain.wecansync.com
 mkdir -p "$DOCROOT/releases"
-rsync -rt --chmod=D755,F644 dist/site/releases/0.5.10 "$DOCROOT/releases/"
-rsync -rt --chmod=D755,F644 --exclude 'releases/0.5.10' dist/site/ "$DOCROOT/"
+rsync -rt --chmod=D755,F644 dist/site/releases/0.5.11 "$DOCROOT/releases/"
+rsync -rt --chmod=D755,F644 --exclude 'releases/0.5.11' dist/site/ "$DOCROOT/"
 ```
 
 The Apache host is
@@ -142,8 +142,8 @@ with that update.
 
 ```sh
 curl -fsS https://agentbrain.wecansync.com/releases/latest.json
-cd "$(mktemp -d)" && curl -fsSLO https://agentbrain.wecansync.com/releases/0.5.10/checksums.txt \
-  && curl -fsSLO https://agentbrain.wecansync.com/releases/0.5.10/agent-brain_linux_amd64.tar.gz \
+cd "$(mktemp -d)" && curl -fsSLO https://agentbrain.wecansync.com/releases/0.5.11/checksums.txt \
+  && curl -fsSLO https://agentbrain.wecansync.com/releases/0.5.11/agent-brain_linux_amd64.tar.gz \
   && sha256sum -c --ignore-missing checksums.txt
 curl -fsSL https://agentbrain.wecansync.com/install.sh \
   | AGENT_BRAIN_BIN_DIR="$(mktemp -d)" AGENT_BRAIN_NO_INTEGRATE=1 sh
