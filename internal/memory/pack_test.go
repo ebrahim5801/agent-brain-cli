@@ -42,7 +42,7 @@ func TestBuildPackFormatAndHeader(t *testing.T) {
 			t.Errorf("pack missing %q", must)
 		}
 	}
-	wantLine := "[#" + strconv.FormatInt(res.ID, 10) + "] (decision, explicit, git: unknown: no git state; verification: unverified; scope: unknown (legacy)) \"use pgx directly\""
+	wantLine := "[#" + strconv.FormatInt(res.ID, 10) + "] (decision, explicit) \"use pgx directly\""
 	if !strings.Contains(pack.Text, wantLine) {
 		t.Errorf("pack missing entry line %q in:\n%s", wantLine, pack.Text)
 	}
@@ -251,9 +251,9 @@ func TestPackRendersPriorityOnlyWhenNotNormal(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"[#" + strconv.FormatInt(crit.ID, 10) + "] (task_state, auto, critical, git: unknown: no git state; verification: unverified; scope: unknown (legacy))",
-		"[#" + strconv.FormatInt(bg.ID, 10) + "] (fact, auto, background, git: unknown: no git state; verification: unverified; scope: unknown (legacy))",
-		"[#" + strconv.FormatInt(norm.ID, 10) + "] (fact, auto, git: unknown: no git state; verification: unverified; scope: unknown (legacy))",
+		"[#" + strconv.FormatInt(crit.ID, 10) + "] (task_state, auto, critical)",
+		"[#" + strconv.FormatInt(bg.ID, 10) + "] (fact, auto, background)",
+		"[#" + strconv.FormatInt(norm.ID, 10) + "] (fact, auto)",
 	} {
 		if !strings.Contains(pack.Text, want) {
 			t.Errorf("pack missing %q in:\n%s", want, pack.Text)

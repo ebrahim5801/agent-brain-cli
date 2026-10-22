@@ -99,6 +99,12 @@ func runUsePostgres(dsn string) error {
 	if err != nil {
 		return err
 	}
+	// A shared PostgreSQL store is never upgraded automatically, even an empty
+	// one: nothing here can stop a teammate writing to it between the check
+	// and the upgrade.
+	if src.MemoryV2 && !dst.MemoryV2 {
+		return fmt.Errorf("this machine's store uses Memory V2, so the PostgreSQL store needs it first: run `AGENT_BRAIN_PG_DSN=<dsn> agent-brain memory upgrade-v2 --apply` once, then retry")
+	}
 	if hasData {
 		counts, err := src.TransferTo(dst)
 		if err != nil {

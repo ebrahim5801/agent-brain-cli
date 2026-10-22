@@ -68,8 +68,8 @@ func (s *Store) writeLifecycle(tx *sql.Tx, id int64, w V2Write, at string, r *V2
 		}
 		seen[target] = true
 		var pid int64
-		var state, kind string
-		err := tx.QueryRow(s.Rebind(`SELECT project_id,status,kind FROM memories WHERE id=?`), target).Scan(&pid, &state, &kind)
+		var state, kind, origin string
+		err := tx.QueryRow(s.Rebind(`SELECT project_id,status,kind,origin FROM memories WHERE id=?`), target).Scan(&pid, &state, &kind, &origin)
 		if errors.Is(err, sql.ErrNoRows) || pid != w.Memory.ProjectID || target == id || state != MemoryActive {
 			r.Rejected[target] = "not an active entry of this project"
 			continue
@@ -77,8 +77,8 @@ func (s *Store) writeLifecycle(tx *sql.Tx, id int64, w V2Write, at string, r *V2
 		if err != nil {
 			return err
 		}
-		var targetScope string
-		scopeErr := tx.QueryRow(s.Rebind(`SELECT scope FROM memory_details WHERE memory_id=? AND project_id=?`), target, pid).Scan(&targetScope)
+		var targetScope, targetSource string
+		scopeErr := tx.QueryRow(s.Rebind(`SELECT scope,COALESCE(source_handle,'') FROM memory_details WHERE memory_id=? AND project_id=?`), target, pid).Scan(&targetScope, &targetSource)
 		if scopeErr != nil && !errors.Is(scopeErr, sql.ErrNoRows) {
 			return scopeErr
 		}
@@ -106,7 +106,17 @@ func (s *Store) writeLifecycle(tx *sql.Tx, id int64, w V2Write, at string, r *V2
 		if err := s.appendState(tx, pid, 0, rid, "proposed", eid, revision, w.Details.SourceHandle, at); err != nil {
 			return err
 		}
-		if eid == "" || revision != w.ExpectedRevision || kind != "decision" || w.Memory.Kind != "decision" || targetScope != w.Details.Scope {
+		userReplacement := eid != "" && revision == w.ExpectedRevision && kind == "decision" && w.Memory.Kind == "decision" && targetScope == w.Details.Scope
+		// A session may update its own progress note: an automatic task note
+		// written under the same session handle, in the same scope, replaced by
+		// another task note. Handles identify sessions but are not secret (history
+		// shows them), so this is limited to task notes; decisions, facts and
+		// conventions, entries the user stated, and other sessions' notes still
+		// need review.
+		ownReplacement := !w.DisableTransitions && origin == "auto" && kind == "task_state" &&
+			w.Memory.Kind == "task_state" && targetSource != "" &&
+			targetSource == w.Details.SourceHandle && targetScope == w.Details.Scope
+		if !userReplacement && !ownReplacement {
 			r.Pending = append(r.Pending, target)
 			continue
 		}
@@ -384,6 +394,21 @@ func (s *Store) MemorySnapshot(projectID int64, scopes map[string]bool) (MemoryH
 			result.Entries[source].Conflicted = true
 			result.Entries[target].ConflictRefs += "#" + strconv.FormatInt(r.SourceID, 10) + " "
 			result.Entries[source].ConflictRefs += "#" + strconv.FormatInt(r.TargetID, 10) + " "
+		}
+	}
+	// Checked after every status is known: a proposed replacement counts only
+	// while it is itself still current.
+	for _, r := range result.Relations {
+		if r.Type != "supersedes" || r.State != "pending" || (r.Scope != "" && !scopes[r.Scope] && !scopes["*"]) {
+			continue
+		}
+		target, ok := index[r.TargetID]
+		if !ok {
+			continue
+		}
+		source, ok := index[r.SourceID]
+		if ok && result.Entries[source].Status == MemoryActive && result.Entries[target].Status == MemoryActive {
+			result.Entries[target].PendingReplacement = r.SourceID
 		}
 	}
 	return result, tx.Commit()

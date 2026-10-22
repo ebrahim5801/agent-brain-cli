@@ -23,6 +23,7 @@ import (
 
 	"github.com/ebrahim5801/agent-brain-cli/internal/assistant"
 	"github.com/ebrahim5801/agent-brain-cli/internal/assistant/settingsfile"
+	"github.com/ebrahim5801/agent-brain-cli/internal/fsutil"
 )
 
 // Assistant is the adapter name recorded on sessions.
@@ -280,7 +281,7 @@ func Install(binPath string) (backups []string, err error) {
 		if err := os.WriteFile(tmp, want, 0o644); err != nil {
 			return nil, err
 		}
-		if err := os.Rename(tmp, pPath); err != nil {
+		if err := fsutil.Rename(tmp, pPath); err != nil {
 			return nil, err
 		}
 	}

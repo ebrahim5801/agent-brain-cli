@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ebrahim5801/agent-brain-cli/internal/attribution"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // Status has no project upsert/retrieval telemetry: it can safely identify a
@@ -15,7 +15,7 @@ type statusIn struct {
 }
 
 func (s *Server) addStatusTool() {
-	mcp.AddTool(s.mcp, &mcp.Tool{Name: "memory_status", Description: "Read local store/schema capability and binding health before capture. Compare store_fingerprint across assistants; inactive V2 or restart_required must not be treated as acknowledged capture.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}}, s.status)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "memory_status", Annotations: readOnlyTool(), Description: "Read local store/schema capability and binding health before capture. Compare store_fingerprint across assistants; inactive V2 or restart_required must not be treated as acknowledged capture."}, s.status)
 }
 func (s *Server) status(ctx context.Context, req *mcp.CallToolRequest, in statusIn) (*mcp.CallToolResult, any, error) {
 	if s.st == nil {

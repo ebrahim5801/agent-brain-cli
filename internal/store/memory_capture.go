@@ -189,12 +189,24 @@ func (s *Store) CompleteCapture(id string, b SessionBinding, generation int64, n
 	if err := s.lockProject(tx, b.ProjectID); err != nil {
 		return CaptureBatch{}, err
 	}
-	var state, executor, lease string
+	var state, executor, lease, source string
 	var gen int64
 	var ready intBool
-	err = tx.QueryRow(s.Rebind(`SELECT state,COALESCE(executor_handle,''),generation,lease_until,manifest_ready FROM memory_capture_batches WHERE id=? AND project_id=?`), id, b.ProjectID).Scan(&state, &executor, &gen, &lease, &ready)
+	err = tx.QueryRow(s.Rebind(`SELECT state,COALESCE(executor_handle,''),generation,lease_until,manifest_ready,source_handle FROM memory_capture_batches WHERE id=? AND project_id=?`), id, b.ProjectID).Scan(&state, &executor, &gen, &lease, &ready, &source)
 	if err != nil {
 		return CaptureBatch{}, ErrAttribution
+	}
+	// The session a request was issued to can answer "nothing to save" in one
+	// call, without beginning an empty manifest first. Only that session knows
+	// whether it learned anything, so another session cannot close it this way.
+	if noChanges && state == "pending" && executor == "" && !bool(ready) && source == b.Handle && gen == generation {
+		if _, err := s.ExecTx(tx, `UPDATE memory_capture_batches SET state='no_durable_changes',executor_handle=?,manifest_ready=1,lease_until='',updated_at=? WHERE id=? AND project_id=?`, b.Handle, now.UTC().Format(TimeLayout), id, b.ProjectID); err != nil {
+			return CaptureBatch{}, err
+		}
+		if err := tx.Commit(); err != nil {
+			return CaptureBatch{}, err
+		}
+		return s.CaptureStatus(id, b.ProjectID)
 	}
 	if gen != generation || executor != b.Handle {
 		return CaptureBatch{}, ErrCaptureConflict
@@ -444,7 +456,11 @@ func (s *Store) DeferCapture(id string, b SessionBinding, generation int64, reas
 	if err := tx.QueryRow(s.Rebind(`SELECT state,COALESCE(executor_handle,''),generation,retries FROM memory_capture_batches WHERE id=? AND project_id=?`), id, b.ProjectID).Scan(&state, &executor, &gen, &retries); err != nil {
 		return CaptureBatch{}, ErrAttribution
 	}
-	if state != "in_progress" || gen != generation || executor != b.Handle {
+	// A batch nobody has begun can be deferred directly, so an agent can always
+	// acknowledge a capture request it cannot carry out.
+	unbegun := state == "pending" && executor == ""
+	owned := state == "in_progress" && executor == b.Handle
+	if (!unbegun && !owned) || gen != generation {
 		return CaptureBatch{}, ErrCaptureConflict
 	}
 	next := ""
@@ -460,7 +476,7 @@ func (s *Store) DeferCapture(id string, b SessionBinding, generation int64, reas
 		}
 		next = now.Add(delay).UTC().Format(TimeLayout)
 	}
-	if _, err := s.ExecTx(tx, `UPDATE memory_capture_batches SET state=?,lease_until='',retries=retries+1,next_retry=?,updated_at=? WHERE id=? AND project_id=?`, state, next, now.UTC().Format(TimeLayout), id, b.ProjectID); err != nil {
+	if _, err := s.ExecTx(tx, `UPDATE memory_capture_batches SET state=?,executor_handle=?,lease_until='',retries=retries+1,next_retry=?,updated_at=? WHERE id=? AND project_id=?`, state, b.Handle, next, now.UTC().Format(TimeLayout), id, b.ProjectID); err != nil {
 		return CaptureBatch{}, err
 	}
 	if err := tx.Commit(); err != nil {
