@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"os"
 )
 
 // Forward-only migrations; index in this slice + 1 is the schema version.
@@ -203,11 +204,22 @@ CREATE INDEX idx_memories_priority ON memories(project_id, priority) WHERE statu
 // the slice: the Postgres baseline is one step carrying eight versions, so an
 // index is not a version there and comparing the two skips every migration
 // appended after the baseline.
+//
+// A brand-new SQLite store (no schema yet) is created at Memory V2 directly:
+// it holds no rows a reviewed upgrade would have to protect, and every process
+// opening it is the binary that created it. Existing stores and PostgreSQL,
+// which teammates' older binaries may share, still need the explicit upgrade.
+// AGENT_BRAIN_MEMORY_V2_DEFAULT=off keeps new stores in the older format.
 func migrate(db *sql.DB, backend Backend) error {
-	return migrateTo(db, backend, 15)
+	freshV2 := backend == BackendSQLite && os.Getenv("AGENT_BRAIN_MEMORY_V2_DEFAULT") != "off"
+	return migrateWith(db, backend, 15, freshV2)
 }
 
 func migrateTo(db *sql.DB, backend Backend, target int) error {
+	return migrateWith(db, backend, target, false)
+}
+
+func migrateWith(db *sql.DB, backend Backend, target int, freshV2 bool) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -233,6 +245,9 @@ func migrateTo(db *sql.DB, backend Backend, target int) error {
 	}
 	if current > len(migrations) {
 		return fmt.Errorf("store schema %d needs a newer compatible binary", current)
+	}
+	if freshV2 && current == 0 {
+		target = memoryV2Version
 	}
 	steps := migrationSteps(backend)
 	insertVersion := rebind(backend, `INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`)

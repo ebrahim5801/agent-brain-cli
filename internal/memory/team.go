@@ -152,7 +152,7 @@ func teamLines(st *store.Store, projectID int64, dir, query string, filter Filte
 	lines := make([]string, 0, len(items))
 	uids := make([]string, 0, len(items))
 	for _, it := range items {
-		lines = append(lines, renderItem(it))
+		lines = append(lines, renderItem(it, false))
 		uids = append(uids, it.uid)
 	}
 	return lines, uids, nil
@@ -162,9 +162,11 @@ func teamLines(st *store.Store, projectID int64, dir, query string, filter Filte
 // established [#id] form; team entries lead with a stable [team#<handle>] the
 // assistant can pass back to memory_save's supersedes_team, followed by
 // attribution and state.
-func renderItem(it packItem) string {
+// renderItem renders a pack or search item; lean is the shorter injected form
+// (see renderEntry).
+func renderItem(it packItem, lean bool) string {
 	if !it.isTeam {
-		return RenderEntry(Ranked{Entry: it.entry, Freshness: it.freshness, Score: it.score})
+		return renderEntry(Ranked{Entry: it.entry, Freshness: it.freshness, Score: it.score}, lean)
 	}
 	var meta strings.Builder
 	meta.WriteString("team · ")
@@ -176,7 +178,11 @@ func renderItem(it packItem) string {
 	if tag := priorityTag(it.priority); tag != "" {
 		meta.WriteString(safeLabel(tag) + " · ")
 	}
-	meta.WriteString("git: " + safeLabel(it.freshness.Render()) + "; verification: unverified")
+	if lean {
+		meta.WriteString("git: " + safeLabel(it.freshness.Render()))
+	} else {
+		meta.WriteString("git: " + safeLabel(it.freshness.Render()) + "; verification: unverified")
+	}
 	if it.contradicts {
 		meta.WriteString(" · CONTRADICTS another team entry")
 	}

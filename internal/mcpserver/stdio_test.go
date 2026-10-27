@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,9 @@ func stdioSession(t *testing.T) *mcp.ClientSession {
 	}
 
 	bin := filepath.Join(t.TempDir(), "agent-brain")
+	if runtime.GOOS == "windows" {
+		bin += ".exe" // Windows runs only files with an executable extension
+	}
 	if out, err := exec.Command("go", "build", "-o", bin, "github.com/ebrahim5801/agent-brain-cli/cmd/agent-brain").CombinedOutput(); err != nil {
 		t.Fatalf("build agent-brain: %v\n%s", err, out)
 	}

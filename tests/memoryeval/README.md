@@ -5,7 +5,7 @@ Fixtures are synthetic: 150 retrieval queries (50 held out by subject family),
 The tests measure retrieval and persistence/verification protocols, not a model's
 general extraction accuracy. Scale is opt-in: 10,000 records, seed 42, 30 samples.
 
-Run SQLite tests with `GOTOOLCHAIN=go1.26.9 go test ./tests/memoryeval`.
+Run SQLite tests with `GOTOOLCHAIN=go1.26.10 go test ./tests/memoryeval`.
 For PostgreSQL, set `AGENT_BRAIN_TEST_PG_DSN` to a **disposable** database and
 `AGENT_BRAIN_REQUIRE_PG=1`; the harness uses per-test schemas. Never use a real
 corpus, production DSN or copied authentication/transcripts. CI provides a scratch

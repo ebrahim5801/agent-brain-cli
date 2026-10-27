@@ -1,8 +1,10 @@
 // Package entitlement decides whether memory capture and serving are active
-// on this machine. The tier itself is decided server-side and cached in
-// global config; this package only honors that cached decision within a
-// bounded grace window (constitution: tier limits enforced server-side —
-// the client never invents a tier, and never extends VerifiedAt locally).
+// on this machine. Personal memory is local and free: it needs only the
+// user's consent. The Pro tier is decided server-side and cached in global
+// config for the cloud features; this package only honors that cached
+// decision within a bounded grace window (constitution: tier limits enforced
+// server-side — the client never invents a tier, and never extends
+// VerifiedAt locally).
 package entitlement
 
 import (
@@ -39,10 +41,11 @@ func Paused(cfg *config.Config, now time.Time) bool {
 }
 
 // MemoryActive is the single gate evaluated before every capture and serve:
-// server-verified Pro within grace, memory consent granted, project not
-// disabled.
+// memory consent granted and project not disabled. Personal memory never
+// leaves this machine, so it needs no account or plan; now is kept for
+// callers that also evaluate time-bound gates.
 func MemoryActive(cfg *config.Config, projectDisabled bool, now time.Time) bool {
-	return Entitled(cfg, now) && cfg.MemoryConsented() && !projectDisabled
+	return cfg != nil && cfg.MemoryConsented() && !projectDisabled
 }
 
 // TeamMemoryActive gates memory on an org-linked project. Unlike personal
@@ -61,10 +64,6 @@ func Reason(cfg *config.Config, projectDisabled bool, now time.Time) string {
 	switch {
 	case cfg == nil || !cfg.MemoryConsented():
 		return "not enabled"
-	case Paused(cfg, now):
-		return "paused (entitlement unverified > 7 days)"
-	case !Entitled(cfg, now):
-		return "a Pro feature"
 	case projectDisabled:
 		return "disabled for this project"
 	default:

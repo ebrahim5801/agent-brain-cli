@@ -92,7 +92,10 @@ machine — the sync protocol has no fields for them.
 To stop: `agent-brain unlink` (one project), `agent-brain consent withdraw`
 (all transmission), `agent-brain logout` (the machine).
 
-## 5. Optional: memory (Pro)
+## 5. Optional: memory
+
+Personal memory is free and needs no account: it is stored only on this
+machine.
 
 ```sh
 agent-brain memory enable

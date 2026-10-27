@@ -64,6 +64,60 @@ func TestMCPSaveIsAssistantBlindAndServesBack(t *testing.T) {
 	}
 }
 
+// Personal memory is local and free: a signed-out machine with memory consent
+// saves and serves memory, and without consent the remedy is the free enable
+// step, never a sign-in or an upgrade.
+func TestMCPLocalMemoryNeedsNoAccount(t *testing.T) {
+	t.Setenv("AGENT_BRAIN_CONFIG_DIR", t.TempDir())
+	dir := t.TempDir()
+	st, err := store.OpenAt(filepath.Join(t.TempDir(), "agent-brain.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	s := New(st, dir, "test")
+	in := saveIn{Content: "keep migrations reversible", Kind: "convention", Origin: "explicit"}
+
+	_, _, err = s.save(context.Background(), &mcp.CallToolRequest{}, in)
+	if err == nil {
+		t.Fatal("save without memory consent succeeded")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "memory is not enabled") || !strings.Contains(msg, "agent-brain memory enable") {
+		t.Errorf("no-consent error = %q, want the enable remedy", msg)
+	}
+	for _, word := range []string{"Pro", "login", "upgrade", "sign"} {
+		if strings.Contains(msg, word) {
+			t.Errorf("no-consent error mentions %q: %q", word, msg)
+		}
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if _, err := config.Update(func(c *config.Config) error {
+		c.Consent.Memory = &config.Consent{GrantedAt: now}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.save(context.Background(), &mcp.CallToolRequest{}, in); err != nil {
+		t.Fatalf("signed-out save with consent: %v", err)
+	}
+	proj := attribution.Resolve(dir)
+	pid, err := st.UpsertProject(store.ProjectIdentity{
+		Kind: proj.Kind, Identity: proj.Identity, DisplayName: proj.DisplayName,
+	}, store.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pack, err := memory.BuildPack(st, pid, dir, 2000, gitBudget, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(pack.Text, "keep migrations reversible") {
+		t.Errorf("signed-out memory not served back in pack:\n%s", pack.Text)
+	}
+}
+
 // Attribution requires a validated per-request handle. Concurrent tracked
 // sessions never make an unbound save inherit the newest session.
 func TestMCPSaveRequiresExplicitAttribution(t *testing.T) {

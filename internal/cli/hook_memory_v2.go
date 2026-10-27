@@ -9,6 +9,35 @@ import (
 	"github.com/ebrahim5801/agent-brain-cli/internal/store"
 )
 
+// The periodic checkpoint asks for a save during long stretches of work that
+// stay below the tool-call checkpoint. It needs a few real tool calls since the
+// last request, so a mostly conversational stretch does not trigger it, and it
+// waits longer each time the agent answered that nothing durable happened:
+// 5, 10, 20 and 40 minutes, then at most an hour. A save that persisted
+// something resets the wait.
+const (
+	periodicMinTools = 5
+	periodicBaseWait = 5 * time.Minute
+	periodicMaxWait  = time.Hour
+)
+
+func periodicWait(st *store.Store, handle string) time.Duration {
+	rows, err := st.Query(`SELECT state FROM memory_capture_batches WHERE source_handle=? AND state IN ('persisted','no_durable_changes') ORDER BY updated_at DESC,watermark DESC LIMIT 5`, handle)
+	if err != nil {
+		return periodicBaseWait
+	}
+	defer rows.Close()
+	wait := periodicBaseWait
+	for rows.Next() {
+		var state string
+		if rows.Scan(&state) != nil || state != "no_durable_changes" {
+			break
+		}
+		wait *= 2
+	}
+	return min(wait, periodicMaxWait)
+}
+
 func v2CaptureReason(st *store.Store, logger *diag.Logger, sessionID, projectID int64, trigger string, threshold int) string {
 	if os.Getenv("AGENT_BRAIN_MEMORY_V2_AUTOMATION") == "off" {
 		return ""
@@ -54,11 +83,22 @@ func v2CaptureReason(st *store.Store, logger *diag.Logger, sessionID, projectID 
 				_ = st.QueryRow(`SELECT started_at FROM sessions WHERE id=?`, sessionID).Scan(&lastAt)
 			}
 			at, err := time.Parse(store.TimeLayout, lastAt)
-			if err != nil || time.Since(at) < 5*time.Minute || since == 0 {
+			if err != nil || since < periodicMinTools || time.Since(at) < periodicWait(st, handle) {
 				return ""
 			}
 			trigger = "periodic"
 		}
+	}
+	// A request that was delivered but never begun is not followed by another of
+	// the same kind: an agent that cannot act on it would be blocked at every
+	// stop without progress. Beginning or deferring it re-arms capture.
+	class := "trigger='stop'"
+	if trigger != "stop" {
+		class = "trigger IN ('checkpoint','periodic')"
+	}
+	var unanswered int
+	if err := st.QueryRow(`SELECT COUNT(*) FROM memory_capture_batches WHERE source_handle=? AND `+class+` AND state='pending' AND executor_handle IS NULL AND retries>0 AND watermark<>?`, handle, watermark).Scan(&unanswered); err != nil || unanswered > 0 {
+		return ""
 	}
 	batch, err := st.RequestCapture(binding, trigger, watermark, time.Now())
 	if err != nil {
@@ -84,7 +124,7 @@ func v2CaptureReason(st *store.Store, logger *diag.Logger, sessionID, projectID 
 	if err != nil || n != 1 {
 		return ""
 	}
-	return fmt.Sprintf("Local memory capture checkpoint: session_handle=%s, batch_id=%s. Call memory_capture_begin with that batch and stable item labels; save each durable decision/task/fact using its returned operation_id, generation, batch_id and session_handle. Include rationale and referenced evidence. Then call memory_capture_complete after every item is persisted, or explicitly no_durable_changes for an empty manifest. Never guess user evidence or re-save acknowledged items. If context is unavailable, use memory_capture_defer(reason=context_unavailable) and report the gap. Then continue your task.", handle, batch.ID)
+	return fmt.Sprintf("Local memory capture checkpoint: session_handle=%s, batch_id=%s. If nothing durable was learned since the last save, call memory_capture_complete once with that batch_id and no_durable_changes: true, then continue. Otherwise call memory_capture_begin with that batch and stable item labels; save each durable decision/task/fact using its returned operation_id, generation, batch_id and session_handle, with a rationale and any referenced evidence (supersedes:[id] replaces an entry this session made outdated); then call memory_capture_complete. Never guess user evidence or re-save acknowledged items. If context is unavailable, use memory_capture_defer(reason=context_unavailable) and report the gap. Then continue your task.", handle, batch.ID)
 }
 
 func v2RecoveryNote(st *store.Store, projectID int64) string {

@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -56,7 +57,8 @@ func TestSaveWithStorageIsPrivate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fi.Mode().Perm() != 0o600 {
+	// Windows has no Unix modes; Go reports every writable file as 0666.
+	if fi.Mode().Perm() != 0o600 && runtime.GOOS != "windows" {
 		t.Errorf("config holding a DSN has perms %v, want 0600", fi.Mode().Perm())
 	}
 }
