@@ -67,6 +67,7 @@ rebuilt byte for byte from the commit it was built from:
 | 0.5.9 | 755442c (wecansync feat/memory-upkeep) | 1.26.10 |
 | 0.5.10 | ffbd6b6 (wecansync feat/memory-import) | 1.26.10 |
 | 0.5.11 | 5c6eab1 (wecansync feat/memory-v2-default) | 1.26.10 |
+| 0.5.12 | 7d0dc5c (wecansync feat/memory-by-session) | 1.26.10 |
 
 ## 3. Publish the site
 
