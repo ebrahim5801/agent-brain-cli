@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.12 - 2026-10-27
+
+### Added
+
+- Clean up after one session without turning memory off. `agent-brain memory
+  show <id>` prints the session that saved an entry; `agent-brain memory list
+  --session <id>` lists everything that session saved; `agent-brain memory
+  delete --session <id>` soft-deletes the session's active entries and
+  restores the older entries from other sessions that they had replaced,
+  which otherwise stay hidden behind a deleted replacement. It previews both
+  lists and asks first (`--yes` skips the question). A session ID can be
+  shortened to its first 8 characters when that is unique. There is no MCP
+  tool for it: removing memories stays a step the user takes.
+
 ## 0.5.11 - 2026-10-22
 
 ### Added
