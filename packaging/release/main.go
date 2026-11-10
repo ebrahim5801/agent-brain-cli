@@ -1,6 +1,6 @@
 // Command release builds the agent-brain release archives for every supported
 // platform and lays them out, together with the static site, as the docroot
-// served at https://agentbrain.wecansync.com:
+// served at https://agentbrain.sync.com.lb:
 //
 //	go run ./packaging/release -version 0.1.0
 //
@@ -72,7 +72,7 @@ func main() {
 	version := flag.String("version", "", "release version, for example 0.1.0 (required)")
 	out := flag.String("out", filepath.Join("dist", "site"), "output docroot; replaced if it holds an earlier build")
 	allowDirty := flag.Bool("allow-dirty", false, "build even if the git working tree has uncommitted changes")
-	updateURL := flag.String("update-url", "https://agentbrain.wecansync.com", "https site the binaries update from (the docroot this builds); empty updates from the cloud server")
+	updateURL := flag.String("update-url", "https://agentbrain.sync.com.lb", "https site the binaries update from (the docroot this builds); empty updates from the cloud server")
 	flag.Parse()
 	if err := run(strings.TrimPrefix(*version, "v"), *out, *allowDirty, *updateURL); err != nil {
 		fmt.Fprintln(os.Stderr, "release:", err)

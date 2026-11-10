@@ -1,7 +1,7 @@
 #!/bin/sh
 # agent-brain installer for macOS and Linux.
 #
-#   curl -fsSL https://agentbrain.wecansync.com/install.sh | sh
+#   curl -fsSL https://agentbrain.sync.com.lb/install.sh | sh
 #
 # Downloads the prebuilt binary for this OS and CPU, checks it against the
 # release's checksums.txt, installs it, then offers to run `agent-brain
@@ -16,7 +16,7 @@
 
 set -eu
 
-BASE_URL="${AGENT_BRAIN_BASE_URL:-https://agentbrain.wecansync.com}"
+BASE_URL="${AGENT_BRAIN_BASE_URL:-https://agentbrain.sync.com.lb}"
 BASE_URL="${BASE_URL%/}"
 BIN_DIR="${AGENT_BRAIN_BIN_DIR:-$HOME/.local/bin}"
 VERSION="${AGENT_BRAIN_VERSION:-}"

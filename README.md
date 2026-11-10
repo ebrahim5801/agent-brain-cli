@@ -15,13 +15,13 @@ machine unless you explicitly link a project and grant consent.
 One command installs the prebuilt binary — no Go needed:
 
 ```sh
-curl -fsSL https://agentbrain.wecansync.com/install.sh | sh
+curl -fsSL https://agentbrain.sync.com.lb/install.sh | sh
 ```
 
 On Windows, in PowerShell:
 
 ```powershell
-irm https://agentbrain.wecansync.com/install.ps1 | iex
+irm https://agentbrain.sync.com.lb/install.ps1 | iex
 ```
 
 The installer downloads the binary for your OS and CPU (Linux, macOS, or
@@ -30,7 +30,7 @@ installs it, and offers to run `agent-brain install` for your assistants. Set
 `AGENT_BRAIN_VERSION=0.5.0` to pin a version, `AGENT_BRAIN_BIN_DIR=DIR` to
 choose the folder, `AGENT_BRAIN_NO_INTEGRATE=1` to install the binary only, or
 `AGENT_BRAIN_YES=1` to integrate every detected assistant without asking. The
-full guide is at <https://agentbrain.wecansync.com/docs/>.
+full guide is at <https://agentbrain.sync.com.lb/docs/>.
 
 `git` is optional but recommended — without it, memory entries are stored
 without git context.
@@ -211,7 +211,7 @@ separate, closed-source product; this repository contains only the client.
 | [SECURITY.md](SECURITY.md) | How to report a vulnerability |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 | [LICENSE](LICENSE) / [NOTICE](NOTICE) | MIT License terms, name, and attribution |
-| [docs/releasing.md](docs/releasing.md) | Building a release and publishing it to agentbrain.wecansync.com |
+| [docs/releasing.md](docs/releasing.md) | Building a release and publishing it to agentbrain.sync.com.lb |
 
 ## Building
 

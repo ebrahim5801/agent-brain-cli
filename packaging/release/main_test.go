@@ -223,7 +223,7 @@ func TestRunRejectsANonHTTPSUpdateURL(t *testing.T) {
 }
 
 func TestCheckUpdateURLAcceptsPlainHTTPS(t *testing.T) {
-	for _, good := range []string{"", "https://agentbrain.wecansync.com", "https://releases.example/agent-brain"} {
+	for _, good := range []string{"", "https://agentbrain.sync.com.lb", "https://releases.example/agent-brain"} {
 		if err := checkUpdateURL(good); err != nil {
 			t.Errorf("checkUpdateURL(%q) = %v", good, err)
 		}

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The site and installers are published at https://agentbrain.sync.com.lb. The former address, agentbrain.wecansync.com, keeps serving the installers and releases, so installed binaries keep updating; its pages redirect to the new address. Builds from now on update from the new address.
+
 ## 0.5.12 - 2026-10-27
 
 ### Added

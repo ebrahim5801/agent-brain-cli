@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Docs — agent-brain</title>
+<link rel="canonical" href="https://agentbrain.sync.com.lb/docs/">
+<meta property="og:url" content="https://agentbrain.sync.com.lb/docs/">
 <meta name="description" content="Install, verify, stats, memory, cloud dashboard, storage, updating, uninstall, privacy and troubleshooting for agent-brain.">
 <meta property="og:title" content="agent-brain docs">
 <meta property="og:type" content="website">
@@ -74,18 +76,18 @@
   <h3>macOS and Linux</h3>
   <div class="code-wrap">
     <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy macOS and Linux install command">Copy</button></div>
-    <pre><code>curl -fsSL https://agentbrain.wecansync.com/install.sh | sh</code></pre>
+    <pre><code>curl -fsSL https://agentbrain.sync.com.lb/install.sh | sh</code></pre>
   </div>
 
   <h3>Windows PowerShell</h3>
   <div class="code-wrap">
     <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy Windows install command">Copy</button></div>
-    <pre><code>irm https://agentbrain.wecansync.com/install.ps1 | iex</code></pre>
+    <pre><code>irm https://agentbrain.sync.com.lb/install.ps1 | iex</code></pre>
   </div>
 
   <h3>What the installer does</h3>
   <ol>
-    <li>Downloads the prebuilt binary for your OS and CPU from <code class="il">https://agentbrain.wecansync.com/releases/</code>.</li>
+    <li>Downloads the prebuilt binary for your OS and CPU from <code class="il">https://agentbrain.sync.com.lb/releases/</code>.</li>
     <li>Checks its SHA-256 against the release's <code class="il">checksums.txt</code>.</li>
     <li>Installs it to <code class="il">~/.local/bin</code> (Windows: <code class="il">%LOCALAPPDATA%\Programs\agent-brain</code>).</li>
     <li>Runs <code class="il">agent-brain install</code> to integrate the assistants it finds. This step asks before changing anything unless <code class="il">AGENT_BRAIN_YES=1</code> is set.</li>
@@ -106,7 +108,7 @@
   </div>
 
   <h3 id="manual-download">Manual download</h3>
-  <p><code class="il">https://agentbrain.wecansync.com/releases/latest.json</code> names the current version and its files. Archives live at <code class="il">/releases/&lt;version&gt;/agent-brain_&lt;os&gt;_&lt;arch&gt;.tar.gz</code> (<code class="il">.zip</code> on Windows), with <code class="il">checksums.txt</code> alongside. <code>os</code> is <code class="il">linux</code>, <code class="il">darwin</code> or <code class="il">windows</code>. <code>arch</code> is <code class="il">amd64</code> or <code class="il">arm64</code>.</p>
+  <p><code class="il">https://agentbrain.sync.com.lb/releases/latest.json</code> names the current version and its files. Archives live at <code class="il">/releases/&lt;version&gt;/agent-brain_&lt;os&gt;_&lt;arch&gt;.tar.gz</code> (<code class="il">.zip</code> on Windows), with <code class="il">checksums.txt</code> alongside. <code>os</code> is <code class="il">linux</code>, <code class="il">darwin</code> or <code class="il">windows</code>. <code>arch</code> is <code class="il">amd64</code> or <code class="il">arm64</code>.</p>
   <div class="table-wrap" data-latest-table>
     <table>
       <thead><tr><th scope="col">OS</th><th scope="col">CPU</th><th scope="col">File</th><th scope="col">SHA-256</th></tr></thead>

@@ -1,6 +1,6 @@
 # Releasing
 
-How to build a release and publish it to https://agentbrain.wecansync.com, the
+How to build a release and publish it to https://agentbrain.sync.com.lb, the
 site behind the one-line installers. Everything is built from this repository;
 the site's source is `site/`.
 
@@ -12,7 +12,7 @@ the site's source is `site/`.
   run with uncommitted changes.
 - Pick a version above the last one published. From 0.5.4, the binaries this
   guide builds update from this site, so the version only has to be above
-  `curl -fsS https://agentbrain.wecansync.com/releases/latest.json`. Installs
+  `curl -fsS https://agentbrain.sync.com.lb/releases/latest.json`. Installs
   of 0.5.3 and earlier still check the cloud server
   (`curl -fsS https://brain.ohnopixel.com/v1/cli/latest`) and, with auto-update
   on by default, replace themselves with any higher version found there.
@@ -29,7 +29,7 @@ go run ./packaging/release -version 0.5.12
 
 This builds Linux, macOS and Windows binaries for amd64 and arm64 with the
 same flags as `.goreleaser.yaml`, plus `-update-url` (default
-https://agentbrain.wecansync.com): the binaries update from this site's
+https://agentbrain.sync.com.lb): the binaries update from this site's
 `releases/latest.json` and `releases/<version>/` instead of the cloud server.
 It checks that the binary for this machine reports the new version, and
 writes the complete docroot to `dist/site`:
@@ -71,6 +71,11 @@ rebuilt byte for byte from the commit it was built from:
 
 ## 3. Publish the site
 
+The site is published at https://agentbrain.sync.com.lb. Its former address,
+agentbrain.wecansync.com, is served from the same folder: it keeps serving
+`install.sh`, `install.ps1` and `releases/` directly, because installed binaries
+update from it, and its pages send a permanent redirect to the new address.
+
 The site is served by Apache from `/var/www/agentbrain.wecansync.com`. Build
 on the web server from a clone of this repository, then copy the new
 version's folder first and everything else second, so `latest.json` never
@@ -93,6 +98,7 @@ renews from its own cron entry, `/etc/cron.d/certbot-agentbrain`:
 
 ```sh
 47 3 * * * root /usr/bin/certbot renew --cert-name agentbrain.wecansync.com --quiet
+47 3 * * * root /usr/bin/certbot renew --cert-name agentbrain.sync.com.lb --quiet
 ```
 
 On nginx instead, an equivalent server block:
@@ -101,7 +107,7 @@ On nginx instead, an equivalent server block:
 server {
     listen 443 ssl;
     http2 on;
-    server_name agentbrain.wecansync.com;
+    server_name agentbrain.sync.com.lb;
     # ssl_certificate / ssl_certificate_key: for example from certbot
 
     root /var/www/agentbrain.wecansync.com;
@@ -124,7 +130,7 @@ server {
 
 server {
     listen 80;
-    server_name agentbrain.wecansync.com;
+    server_name agentbrain.sync.com.lb;
     return 301 https://$host$request_uri;
 }
 ```
@@ -143,11 +149,11 @@ with that update.
 ## 5. Verify
 
 ```sh
-curl -fsS https://agentbrain.wecansync.com/releases/latest.json
-cd "$(mktemp -d)" && curl -fsSLO https://agentbrain.wecansync.com/releases/0.5.12/checksums.txt \
-  && curl -fsSLO https://agentbrain.wecansync.com/releases/0.5.12/agent-brain_linux_amd64.tar.gz \
+curl -fsS https://agentbrain.sync.com.lb/releases/latest.json
+cd "$(mktemp -d)" && curl -fsSLO https://agentbrain.sync.com.lb/releases/0.5.12/checksums.txt \
+  && curl -fsSLO https://agentbrain.sync.com.lb/releases/0.5.12/agent-brain_linux_amd64.tar.gz \
   && sha256sum -c --ignore-missing checksums.txt
-curl -fsSL https://agentbrain.wecansync.com/install.sh \
+curl -fsSL https://agentbrain.sync.com.lb/install.sh \
   | AGENT_BRAIN_BIN_DIR="$(mktemp -d)" AGENT_BRAIN_NO_INTEGRATE=1 sh
 ```
 
