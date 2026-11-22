@@ -17,7 +17,7 @@ curl -fsSL https://agentbrain.wecansync.com/install.sh | sh
 On Windows, in PowerShell: `irm https://agentbrain.wecansync.com/install.ps1 | iex`
 (it installs to `%LOCALAPPDATA%\Programs\agent-brain`).
 
-To build from source instead (requires Go 1.25+):
+To build from source instead (requires Go 1.26+):
 
 ```sh
 git clone https://github.com/ebrahim5801/agent-brain-cli.git
