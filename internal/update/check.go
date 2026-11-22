@@ -1,14 +1,17 @@
-// Package update implements the client self-updater: it asks the cloud server
-// for the latest CLI release, compares versions, and atomically replaces the
-// running binary in place. The binary path must never change — the assistant's
+// Package update implements the client self-updater: it asks the update
+// source (the cloud server, or a static release site) for the latest CLI
+// release, compares versions, and atomically replaces the running binary in
+// place. The binary path must never change — the assistant's
 // MCP/hook settings reference the absolute path (plans/cli-self-update.md).
 package update
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"runtime"
 	"time"
 
@@ -24,16 +27,39 @@ type Result struct {
 	HasAsset bool          // an asset exists for this platform
 }
 
-// Check asks the server for the latest release and compares it to current.
-// serverURL is the vendor cloud base (cfg.Server()); current is the running
-// version. A "dev" current never reports Newer (an untagged build cannot be
-// meaningfully compared) but the manifest is still returned so --force can act.
-func Check(ctx context.Context, client *http.Client, serverURL, current string) (Result, error) {
+// Source is where releases come from. A cloud source (Static false) is the
+// vendor server's /v1/cli/latest and /v1/cli/download/<file> endpoints; a
+// static source is a release site laid out as releases/latest.json and
+// releases/<version>/<file>, as packaging/release writes it.
+type Source struct {
+	Base   string
+	Static bool
+}
+
+func (s Source) latestURL() string {
+	if s.Static {
+		return s.Base + "/releases/latest.json"
+	}
+	return fmt.Sprintf("%s/v1/cli/latest?os=%s&arch=%s", s.Base, runtime.GOOS, runtime.GOARCH)
+}
+
+func (s Source) downloadURL(version, filename string) string {
+	if s.Static {
+		return s.Base + "/releases/" + url.PathEscape(version) + "/" + url.PathEscape(filename)
+	}
+	return s.Base + "/v1/cli/download/" + filename
+}
+
+// Check asks the source for the latest release and compares it to current,
+// the running version. A "dev" current never reports Newer (an untagged build
+// cannot be meaningfully compared) but the manifest is still returned so
+// --force can act.
+func Check(ctx context.Context, client *http.Client, src Source, current string) (Result, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
 	}
-	url := fmt.Sprintf("%s/v1/cli/latest?os=%s&arch=%s", serverURL, runtime.GOOS, runtime.GOARCH)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	client = noDowngrade(client)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src.latestURL(), nil)
 	if err != nil {
 		return Result{}, err
 	}
@@ -59,4 +85,26 @@ func Check(ctx context.Context, client *http.Client, serverURL, current string) 
 		res.Newer = compareVersions(m.Version, current) > 0
 	}
 	return res, nil
+}
+
+// noDowngrade returns a copy of client that refuses a redirect from https to
+// any other scheme. The manifest's SHA-256 only protects an archive if the
+// manifest itself came over TLS, so a release source's https must also cover
+// wherever it redirects.
+func noDowngrade(client *http.Client) *http.Client {
+	c := *client
+	next := client.CheckRedirect
+	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) > 0 && via[0].URL.Scheme == "https" && req.URL.Scheme != "https" {
+			return fmt.Errorf("refusing a redirect from https to %s", req.URL.Redacted())
+		}
+		if next != nil {
+			return next(req, via)
+		}
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return nil
+	}
+	return &c
 }

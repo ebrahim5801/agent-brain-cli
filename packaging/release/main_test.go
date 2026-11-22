@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -182,7 +183,7 @@ func TestFailedBuildLeavesOutUntouched(t *testing.T) {
 	t.Chdir(repo)
 
 	out := filepath.Join(repo, "dist", "site")
-	if err := run("0.1.0", out, false); err == nil {
+	if err := run("0.1.0", out, false, "https://releases.example"); err == nil {
 		t.Fatal("run succeeded although the binary does not compile")
 	}
 	if _, err := os.Stat(out); !os.IsNotExist(err) {
@@ -204,6 +205,27 @@ func TestVersionPattern(t *testing.T) {
 	} {
 		if versionRE.MatchString(v) != ok {
 			t.Errorf("versionRE.MatchString(%q) = %v, want %v", v, !ok, ok)
+		}
+	}
+}
+
+func TestRunRejectsANonHTTPSUpdateURL(t *testing.T) {
+	for _, bad := range []string{
+		"http://releases.example", "releases.example", "https://releases.example/x y",
+		"https://trusted.example\t-X\tgithub.com/ebrahim5801/agent-brain-cli/internal/config.DefaultUpdateURL=https://evil.example",
+		"https://user@releases.example", "https://releases.example/?a=b", "https://",
+	} {
+		err := run("0.1.0", t.TempDir(), true, bad)
+		if err == nil || !strings.Contains(err.Error(), "-update-url") {
+			t.Errorf("run with -update-url %q: err = %v, want an -update-url error", bad, err)
+		}
+	}
+}
+
+func TestCheckUpdateURLAcceptsPlainHTTPS(t *testing.T) {
+	for _, good := range []string{"", "https://agentbrain.wecansync.com", "https://releases.example/agent-brain"} {
+		if err := checkUpdateURL(good); err != nil {
+			t.Errorf("checkUpdateURL(%q) = %v", good, err)
 		}
 	}
 }
