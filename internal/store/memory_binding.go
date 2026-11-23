@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -53,15 +54,23 @@ func (s *Store) EnsureBoundSession(projectID int64, assistant, native, checkout,
 		return SessionBinding{}, err
 	}
 	b := SessionBinding{ProjectID: projectID, Assistant: assistant, NativeID: native, Checkout: checkout, ParentHandle: parent, Provenance: "native"}
+	if parent == "" {
+		found, ok, err := enclosingBinding(tx, s, assistant, native, checkout)
+		if err != nil {
+			return SessionBinding{}, err
+		}
+		if ok {
+			b = found
+			b.Assistant, b.NativeID, b.Provenance = assistant, native, "native"
+			return b, s.reopenBoundSession(tx, b.SessionID, transcript)
+		}
+	}
 	err = tx.QueryRow(s.Rebind(`SELECT handle,session_id,COALESCE(parent_handle,'') FROM memory_session_bindings WHERE project_id=? AND assistant=? AND native_id=? AND checkout=?`), projectID, assistant, native, checkout).Scan(&b.Handle, &b.SessionID, &b.ParentHandle)
 	if err == nil {
 		if b.ParentHandle != parent {
 			return SessionBinding{}, ErrAttribution
 		}
-		if _, err := s.ExecTx(tx, `UPDATE sessions SET sync_dirty=1,transcript_path=COALESCE(NULLIF(?,''),transcript_path),ended_at=CASE WHEN end_reason='interrupted' THEN NULL ELSE ended_at END,end_reason=CASE WHEN end_reason='interrupted' THEN NULL ELSE end_reason END WHERE id=?`, transcript, b.SessionID); err != nil {
-			return SessionBinding{}, err
-		}
-		return b, tx.Commit()
+		return b, s.reopenBoundSession(tx, b.SessionID, transcript)
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return SessionBinding{}, err
@@ -84,6 +93,48 @@ func (s *Store) EnsureBoundSession(projectID int64, assistant, native, checkout,
 		return SessionBinding{}, err
 	}
 	return b, tx.Commit()
+}
+
+func (s *Store) reopenBoundSession(tx *sql.Tx, sessionID int64, transcript string) error {
+	if _, err := s.ExecTx(tx, `UPDATE sessions SET sync_dirty=1,transcript_path=COALESCE(NULLIF(?,''),transcript_path),ended_at=CASE WHEN end_reason='interrupted' THEN NULL ELSE ended_at END,end_reason=CASE WHEN end_reason='interrupted' THEN NULL ELSE end_reason END WHERE id=?`, transcript, sessionID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// enclosingBinding finds the top-level binding of this native session whose
+// checkout is checkout itself or one of its parents, so a hook fired from a
+// nested clone keeps the handle issued where the session started. The
+// outermost match wins. Checkouts outside every bound folder stay independent.
+func enclosingBinding(tx *sql.Tx, s *Store, assistant, native, checkout string) (SessionBinding, bool, error) {
+	rows, err := tx.Query(s.Rebind(`SELECT handle,project_id,session_id,checkout FROM memory_session_bindings WHERE assistant=? AND native_id=? AND parent_handle IS NULL`), assistant, native)
+	if err != nil {
+		return SessionBinding{}, false, err
+	}
+	defer rows.Close()
+	var best SessionBinding
+	found := false
+	for rows.Next() {
+		var b SessionBinding
+		if err := rows.Scan(&b.Handle, &b.ProjectID, &b.SessionID, &b.Checkout); err != nil {
+			return SessionBinding{}, false, err
+		}
+		if !withinDir(b.Checkout, checkout) {
+			continue
+		}
+		if !found || len(b.Checkout) < len(best.Checkout) || (len(b.Checkout) == len(best.Checkout) && b.Handle < best.Handle) {
+			best, found = b, true
+		}
+	}
+	return best, found, rows.Err()
+}
+
+func withinDir(dir, path string) bool {
+	rel, err := filepath.Rel(dir, path)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel))
 }
 
 func (s *Store) lockProject(tx *sql.Tx, projectID int64) error {
