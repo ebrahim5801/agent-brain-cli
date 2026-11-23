@@ -120,6 +120,9 @@ func runHook(event, assistantName string) (stdout string) {
 	if st.MemoryV2 {
 		binding, bindErr := st.EnsureBoundSession(projectID, adapter.Name(), input.SessionKey, input.Cwd, input.TranscriptPath, "")
 		err = bindErr
+		if bindErr == nil {
+			projectID = binding.ProjectID
+		}
 		sessionID = binding.SessionID
 		sessionHandle = binding.Handle
 		externalID = "v2:" + binding.Handle
