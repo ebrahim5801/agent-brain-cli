@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.10 - 2026-10-21
+
+### Added
+
+- `agent-brain memory export --format json` and `agent-brain memory import FILE` move a project's memories to another machine or to a colleague working on the same project. The import shows a summary and asks before writing (`--dry-run` shows the summary only, `--yes` imports without asking). It checks the file came from the same project (same git remote; `--into-current-project` for a project without one) and skips entries already present, so importing twice adds nothing. The file holds nothing tied to the exporting machine: no sessions, transcripts, evidence or paths. Imported entries start unverified, and an import never retires an entry that was already on the machine. Entries shared with a team are left out, since team sync brings them. Without memory V2 on the importing machine, rationales, scoped entries, completed tasks and links are not kept, and the import says so.
+
 ## 0.5.9 - 2026-10-21
 
 ### Security
