@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -40,6 +41,9 @@ func TestInstallScriptsMatchGoMod(t *testing.T) {
 }
 
 func TestInstallShellScriptIsExecutable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no executable bit; git keeps install.sh's mode for other checkouts")
+	}
 	info, err := os.Stat("../install.sh")
 	if err != nil {
 		t.Fatal(err)

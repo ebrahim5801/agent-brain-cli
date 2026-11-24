@@ -69,3 +69,18 @@ func TestNewSQLiteStoreIsPrivate(t *testing.T) {
 		}
 	}
 }
+
+func TestSQLiteStoreUsesWAL(t *testing.T) {
+	st, err := store.OpenAt(filepath.Join(t.TempDir(), "brain.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	var mode string
+	if err := st.QueryRow(`PRAGMA journal_mode`).Scan(&mode); err != nil {
+		t.Fatal(err)
+	}
+	if mode != "wal" {
+		t.Fatalf("journal_mode = %q, want wal", mode)
+	}
+}

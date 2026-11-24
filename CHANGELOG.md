@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.5 - 2026-10-15
+
+### Fixed
+
+- Windows: agent-brain's Claude Code hooks never ran. Claude Code runs hook commands in Git Bash on Windows, which drops the backslashes from the `C:\...\agent-brain.exe` path agent-brain wrote, so every hook failed with "command not found" and no usage, sessions or memories were recorded. Hook commands now use forward slashes on Windows and quote a path a shell would split. `agent-brain status` reports hooks in the old form, and `agent-brain install` rewrites them. macOS and Linux hooks are written as before.
+- The store could fail to open with "database is locked" when several hooks started at the same moment, on every platform. agent-brain now switches the database to WAL mode once, with retries, instead of on every connection.
+- Windows: rewriting `config.json` or an assistant's settings file retries for up to two seconds when another process has the file open, instead of failing with "Access is denied".
+
+### Added
+
+- CI runs the tests on Windows and installs a release with `install.ps1`, then runs every Claude Code hook through Git Bash.
+
 ## 0.5.4 - 2026-10-15
 
 ### Added

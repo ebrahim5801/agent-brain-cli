@@ -36,6 +36,13 @@ func hookWith(t *testing.T, event, assistantName, payload string) string {
 	return runHook(event, assistantName)
 }
 
+// js escapes s for use inside a JSON string literal, so a Windows path such
+// as C:\Users\... stays valid JSON when pasted into a hook payload.
+func js(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b[1 : len(b)-1])
+}
+
 func openTestStore(t *testing.T) *store.Store {
 	t.Helper()
 	st, err := store.Open()
@@ -86,12 +93,12 @@ func TestCaptureCursorHonestAbsenceAndGeminiUsage(t *testing.T) {
 	sandbox(t)
 	proj := t.TempDir()
 
-	hookWith(t, "session-start", "cursor", `{"conversation_id":"c1","workspace_roots":["`+proj+`"],"model":"gpt-x"}`)
-	hookWith(t, "session-end", "cursor", `{"conversation_id":"c1","workspace_roots":["`+proj+`"]}`)
+	hookWith(t, "session-start", "cursor", `{"conversation_id":"c1","workspace_roots":["`+js(proj)+`"],"model":"gpt-x"}`)
+	hookWith(t, "session-end", "cursor", `{"conversation_id":"c1","workspace_roots":["`+js(proj)+`"]}`)
 
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"g1","cwd":"`+proj+`"}`)
-	hookWith(t, "model-usage", "gemini-cli", `{"session_id":"g1","cwd":"`+proj+`","llm_request":{"model":"gemini-2.5-pro"},"llm_response":{"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":40,"cachedContentTokenCount":25}}}`)
-	hookWith(t, "session-end", "gemini-cli", `{"session_id":"g1","cwd":"`+proj+`"}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"g1","cwd":"`+js(proj)+`"}`)
+	hookWith(t, "model-usage", "gemini-cli", `{"session_id":"g1","cwd":"`+js(proj)+`","llm_request":{"model":"gemini-2.5-pro"},"llm_response":{"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":40,"cachedContentTokenCount":25}}}`)
+	hookWith(t, "session-end", "gemini-cli", `{"session_id":"g1","cwd":"`+js(proj)+`"}`)
 
 	st := openTestStore(t)
 
@@ -118,8 +125,8 @@ func TestCaptureCursorHonestAbsenceAndGeminiUsage(t *testing.T) {
 func TestCaptureSameNativeKeyStaysDistinctAcrossAssistants(t *testing.T) {
 	sandbox(t)
 	proj := t.TempDir()
-	hookWith(t, "session-start", "cursor", `{"conversation_id":"dup","workspace_roots":["`+proj+`"]}`)
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"dup","cwd":"`+proj+`"}`)
+	hookWith(t, "session-start", "cursor", `{"conversation_id":"dup","workspace_roots":["`+js(proj)+`"]}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"dup","cwd":"`+js(proj)+`"}`)
 
 	st := openTestStore(t)
 	var n int
@@ -172,11 +179,11 @@ func TestInjectionPackParityAcrossAssistants(t *testing.T) {
 	}
 
 	starts := map[string]string{
-		"cursor":      `{"conversation_id":"s","workspace_roots":["` + proj + `"]}`,
-		"copilot-cli": `{"sessionId":"s","cwd":"` + proj + `"}`,
-		"gemini-cli":  `{"session_id":"s","cwd":"` + proj + `"}`,
-		"claude-code": `{"session_id":"s","cwd":"` + proj + `"}`,
-		"codex":       `{"session_id":"s","cwd":"` + proj + `"}`,
+		"cursor":      `{"conversation_id":"s","workspace_roots":["` + js(proj) + `"]}`,
+		"copilot-cli": `{"sessionId":"s","cwd":"` + js(proj) + `"}`,
+		"gemini-cli":  `{"session_id":"s","cwd":"` + js(proj) + `"}`,
+		"claude-code": `{"session_id":"s","cwd":"` + js(proj) + `"}`,
+		"codex":       `{"session_id":"s","cwd":"` + js(proj) + `"}`,
 	}
 	var packs []string
 	for name, payload := range starts {
@@ -214,7 +221,7 @@ func TestInjectionNoticeClaudeOnly(t *testing.T) {
 		}
 	}
 
-	env := hookWith(t, "session-start", "claude-code", `{"session_id":"n1","cwd":"`+proj+`"}`)
+	env := hookWith(t, "session-start", "claude-code", `{"session_id":"n1","cwd":"`+js(proj)+`"}`)
 	var m map[string]any
 	if err := json.Unmarshal([]byte(env), &m); err != nil {
 		t.Fatalf("claude envelope not JSON: %v (%s)", err, env)
@@ -224,7 +231,7 @@ func TestInjectionNoticeClaudeOnly(t *testing.T) {
 		t.Errorf("systemMessage = %q, want a loaded-2-memories notice", notice)
 	}
 
-	env = hookWith(t, "session-start", "gemini-cli", `{"session_id":"n1","cwd":"`+proj+`"}`)
+	env = hookWith(t, "session-start", "gemini-cli", `{"session_id":"n1","cwd":"`+js(proj)+`"}`)
 	if strings.Contains(env, "systemMessage") {
 		t.Errorf("gemini envelope should carry no notice: %s", env)
 	}
@@ -250,7 +257,7 @@ func TestPromptInjectionWalksPastSeenEntries(t *testing.T) {
 	}
 
 	// Session start serves and records the first memory.
-	if pack := extractPack(t, hookWith(t, "session-start", "claude-code", `{"session_id":"s","cwd":"`+proj+`"}`)); !strings.Contains(pack, "seen at session start") {
+	if pack := extractPack(t, hookWith(t, "session-start", "claude-code", `{"session_id":"s","cwd":"`+js(proj)+`"}`)); !strings.Contains(pack, "seen at session start") {
 		t.Fatalf("session-start pack missing first memory: %q", pack)
 	}
 
@@ -261,7 +268,7 @@ func TestPromptInjectionWalksPastSeenEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	env := hookWith(t, "prompt", "claude-code", `{"session_id":"s","cwd":"`+proj+`"}`)
+	env := hookWith(t, "prompt", "claude-code", `{"session_id":"s","cwd":"`+js(proj)+`"}`)
 	var m map[string]any
 	if err := json.Unmarshal([]byte(env), &m); err != nil {
 		t.Fatalf("prompt envelope not JSON: %v (%s)", err, env)
@@ -278,7 +285,7 @@ func TestPromptInjectionWalksPastSeenEntries(t *testing.T) {
 	}
 
 	// With nothing new since, a second prompt injects nothing.
-	if env := hookWith(t, "prompt", "claude-code", `{"session_id":"s","cwd":"`+proj+`"}`); env != "" {
+	if env := hookWith(t, "prompt", "claude-code", `{"session_id":"s","cwd":"`+js(proj)+`"}`); env != "" {
 		t.Errorf("second prompt should inject nothing, got: %s", env)
 	}
 }
@@ -300,7 +307,7 @@ func TestToolUseInjectionFallbackOncePerTurn(t *testing.T) {
 	}, store.Now()); err != nil {
 		t.Fatal(err)
 	}
-	hookWith(t, "session-start", "cursor", `{"conversation_id":"c","workspace_roots":["`+proj+`"]}`)
+	hookWith(t, "session-start", "cursor", `{"conversation_id":"c","workspace_roots":["`+js(proj)+`"]}`)
 	if _, err := st.InsertMemory(store.NewMemory{
 		ProjectID: pid, Content: "saved mid session", Kind: "convention", Origin: "explicit",
 	}, store.Now()); err != nil {
@@ -308,18 +315,18 @@ func TestToolUseInjectionFallbackOncePerTurn(t *testing.T) {
 	}
 
 	// The prompt hook only permits the submission (no injection channel).
-	if env := hookWith(t, "prompt", "cursor", `{"conversation_id":"c","workspace_roots":["`+proj+`"]}`); env != `{"continue":true}` {
+	if env := hookWith(t, "prompt", "cursor", `{"conversation_id":"c","workspace_roots":["`+js(proj)+`"]}`); env != `{"continue":true}` {
 		t.Errorf("cursor prompt should pass through, got: %s", env)
 	}
 
 	// First tool-use of the turn injects the unseen memory.
-	pack := extractPack(t, hookWith(t, "tool-use", "cursor", `{"conversation_id":"c","workspace_roots":["`+proj+`"],"tool_name":"read_file"}`))
+	pack := extractPack(t, hookWith(t, "tool-use", "cursor", `{"conversation_id":"c","workspace_roots":["`+js(proj)+`"],"tool_name":"read_file"}`))
 	if !strings.Contains(pack, "saved mid session") {
 		t.Errorf("tool-use fallback missing unseen memory: %q", pack)
 	}
 
 	// A second tool-use in the same turn does not re-inject.
-	if env := hookWith(t, "tool-use", "cursor", `{"conversation_id":"c","workspace_roots":["`+proj+`"],"tool_name":"read_file"}`); env != "" {
+	if env := hookWith(t, "tool-use", "cursor", `{"conversation_id":"c","workspace_roots":["`+js(proj)+`"],"tool_name":"read_file"}`); env != "" {
 		t.Errorf("second tool-use same turn should not inject, got: %s", env)
 	}
 }
@@ -341,12 +348,12 @@ func TestToolUseInjectionNotBurnedByEmptyPack(t *testing.T) {
 	}, store.Now()); err != nil {
 		t.Fatal(err)
 	}
-	hookWith(t, "session-start", "cursor", `{"conversation_id":"c","workspace_roots":["`+proj+`"]}`)
-	hookWith(t, "prompt", "cursor", `{"conversation_id":"c","workspace_roots":["`+proj+`"]}`)
+	hookWith(t, "session-start", "cursor", `{"conversation_id":"c","workspace_roots":["`+js(proj)+`"]}`)
+	hookWith(t, "prompt", "cursor", `{"conversation_id":"c","workspace_roots":["`+js(proj)+`"]}`)
 
 	// Nothing unseen yet: the first tool-use injects nothing and must leave the
 	// turn's injection still armed.
-	if env := hookWith(t, "tool-use", "cursor", `{"conversation_id":"c","workspace_roots":["`+proj+`"],"tool_name":"read_file"}`); env != "" {
+	if env := hookWith(t, "tool-use", "cursor", `{"conversation_id":"c","workspace_roots":["`+js(proj)+`"],"tool_name":"read_file"}`); env != "" {
 		t.Fatalf("tool-use with nothing unseen should inject nothing, got: %s", env)
 	}
 
@@ -355,7 +362,7 @@ func TestToolUseInjectionNotBurnedByEmptyPack(t *testing.T) {
 	}, store.Now()); err != nil {
 		t.Fatal(err)
 	}
-	pack := extractPack(t, hookWith(t, "tool-use", "cursor", `{"conversation_id":"c","workspace_roots":["`+proj+`"],"tool_name":"read_file"}`))
+	pack := extractPack(t, hookWith(t, "tool-use", "cursor", `{"conversation_id":"c","workspace_roots":["`+js(proj)+`"],"tool_name":"read_file"}`))
 	if !strings.Contains(pack, "saved mid turn") {
 		t.Errorf("injection was burned by the earlier empty pack; got: %q", pack)
 	}
@@ -386,10 +393,10 @@ func TestPromptInjectionStopsAtSessionCap(t *testing.T) {
 	}
 
 	// Session start serves well past the cap on its own.
-	if pack := extractPack(t, hookWith(t, "session-start", "claude-code", `{"session_id":"s","cwd":"`+proj+`"}`)); pack == "" {
+	if pack := extractPack(t, hookWith(t, "session-start", "claude-code", `{"session_id":"s","cwd":"`+js(proj)+`"}`)); pack == "" {
 		t.Fatal("session-start served nothing")
 	}
-	if env := hookWith(t, "prompt", "claude-code", `{"session_id":"s","cwd":"`+proj+`"}`); env != "" {
+	if env := hookWith(t, "prompt", "claude-code", `{"session_id":"s","cwd":"`+js(proj)+`"}`); env != "" {
 		t.Errorf("prompt past the session cap should inject nothing, got: %s", env)
 	}
 }
@@ -398,7 +405,7 @@ func TestInjectionEmptyWhenMemoryGated(t *testing.T) {
 	sandbox(t)
 	proj := t.TempDir()
 	// Memory not enabled ⇒ gate closed.
-	env := hookWith(t, "session-start", "gemini-cli", `{"session_id":"s","cwd":"`+proj+`"}`)
+	env := hookWith(t, "session-start", "gemini-cli", `{"session_id":"s","cwd":"`+js(proj)+`"}`)
 	if env != "" {
 		t.Errorf("expected empty stdout when memory is gated, got %q", env)
 	}
@@ -443,6 +450,12 @@ func setMemoryCapture(t *testing.T, every, checkpoint *int) {
 
 func intPtr(v int) *int { return &v }
 
+// jsonPath is p as written inside a JSON string; Windows paths have backslashes.
+func jsonPath(p string) string {
+	b, _ := json.Marshal(p)
+	return string(b[1 : len(b)-1])
+}
+
 func TestDistillationFiresOncePerAssistant(t *testing.T) {
 	for _, tc := range []struct{ name, start, prompt, tool, stop string }{
 		{"cursor",
@@ -472,7 +485,7 @@ func TestDistillationFiresOncePerAssistant(t *testing.T) {
 			enableMemoryForTest(t)
 			setMemoryCapture(t, intPtr(1), nil)
 
-			fill := func(s string) string { return strings.ReplaceAll(s, "%s", proj) }
+			fill := func(s string) string { return strings.ReplaceAll(s, "%s", jsonPath(proj)) }
 			hookWith(t, "session-start", tc.name, fill(tc.start))
 			hookWith(t, "prompt", tc.name, fill(tc.prompt))
 			hookWith(t, "tool-use", tc.name, fill(tc.tool))
@@ -496,29 +509,29 @@ func TestDistillationRearmsAfterNewPrompt(t *testing.T) {
 	enableMemoryForTest(t)
 	setMemoryCapture(t, intPtr(1), nil)
 
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`"}`)
-	hookWith(t, "prompt", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`"}`)
-	hookWith(t, "tool-use", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`","tool_name":"edit"}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"r","cwd":"`+js(proj)+`"}`)
+	hookWith(t, "prompt", "gemini-cli", `{"session_id":"r","cwd":"`+js(proj)+`"}`)
+	hookWith(t, "tool-use", "gemini-cli", `{"session_id":"r","cwd":"`+js(proj)+`","tool_name":"edit"}`)
 
-	env := hookWith(t, "stop", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`"}`)
+	env := hookWith(t, "stop", "gemini-cli", `{"session_id":"r","cwd":"`+js(proj)+`"}`)
 	if got := extractReason(t, env); got != distillationReason {
 		t.Fatalf("first stop reason = %q, want the distillation prompt", got)
 	}
-	if again := hookWith(t, "stop", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`"}`); again != "" {
+	if again := hookWith(t, "stop", "gemini-cli", `{"session_id":"r","cwd":"`+js(proj)+`"}`); again != "" {
 		t.Errorf("stop without new prompt emitted %q, want empty", again)
 	}
 
 	// Timestamps have millisecond precision; step past the marker's instant.
 	time.Sleep(2 * time.Millisecond)
-	hookWith(t, "prompt", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`"}`)
+	hookWith(t, "prompt", "gemini-cli", `{"session_id":"r","cwd":"`+js(proj)+`"}`)
 	// every=1 counts a reply that used a tool, so the new reply needs one.
-	hookWith(t, "tool-use", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`","tool_name":"edit"}`)
+	hookWith(t, "tool-use", "gemini-cli", `{"session_id":"r","cwd":"`+js(proj)+`","tool_name":"edit"}`)
 
-	env = hookWith(t, "stop", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`"}`)
+	env = hookWith(t, "stop", "gemini-cli", `{"session_id":"r","cwd":"`+js(proj)+`"}`)
 	if got := extractReason(t, env); got != distillationReason {
 		t.Errorf("stop after new prompt = %q, want the distillation prompt again", got)
 	}
-	if again := hookWith(t, "stop", "gemini-cli", `{"session_id":"r","cwd":"`+proj+`"}`); again != "" {
+	if again := hookWith(t, "stop", "gemini-cli", `{"session_id":"r","cwd":"`+js(proj)+`"}`); again != "" {
 		t.Errorf("post-redistillation stop emitted %q, want empty", again)
 	}
 }
@@ -526,9 +539,9 @@ func TestDistillationRearmsAfterNewPrompt(t *testing.T) {
 // replyWith drives one reply: a prompt followed by n tool calls of the given name.
 func replyWith(t *testing.T, proj string, n int, tool string) {
 	t.Helper()
-	hookWith(t, "prompt", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+	hookWith(t, "prompt", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`"}`)
 	for i := 0; i < n; i++ {
-		hookWith(t, "tool-use", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`","tool_name":"`+tool+`"}`)
+		hookWith(t, "tool-use", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`","tool_name":"`+tool+`"}`)
 	}
 }
 
@@ -536,25 +549,25 @@ func TestDistillationDefaultEveryAccumulatesAcrossReplies(t *testing.T) {
 	sandbox(t)
 	proj := t.TempDir()
 	enableMemoryForTest(t)
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`"}`)
 
 	// Default every is 10: two 3-tool replies (6 total) must stay silent.
 	replyWith(t, proj, 3, "edit")
-	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`); env != "" {
+	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`"}`); env != "" {
 		t.Fatalf("stop after 3 tool calls emitted %q, want empty (below every)", env)
 	}
 	replyWith(t, proj, 3, "edit")
-	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`); env != "" {
+	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`"}`); env != "" {
 		t.Fatalf("stop after 6 tool calls emitted %q, want empty (below every)", env)
 	}
 	// The third and fourth replies cross 10 across replies: the save prompt fires.
 	replyWith(t, proj, 4, "edit")
-	env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+	env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`"}`)
 	if got := extractReason(t, env); got != distillationReason {
 		t.Fatalf("stop after 10 accumulated tool calls = %q, want the distillation prompt", got)
 	}
 	// The immediate post-distillation Stop passes through.
-	if again := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`); again != "" {
+	if again := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`"}`); again != "" {
 		t.Errorf("post-distillation stop emitted %q, want empty", again)
 	}
 }
@@ -563,11 +576,11 @@ func TestDistillationIgnoresMemoryServerToolCalls(t *testing.T) {
 	sandbox(t)
 	proj := t.TempDir()
 	enableMemoryForTest(t)
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`"}`)
 
 	// Twelve memory-server calls must not arm an every=10 save.
 	replyWith(t, proj, 12, "mcp__agent-brain-memory__memory_save")
-	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`); env != "" {
+	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`"}`); env != "" {
 		t.Fatalf("memory-server-only reply emitted %q, want empty", env)
 	}
 }
@@ -577,10 +590,10 @@ func TestDistillationEveryOneReproducesPerReplyGate(t *testing.T) {
 	proj := t.TempDir()
 	enableMemoryForTest(t)
 	setMemoryCapture(t, intPtr(1), nil)
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`"}`)
 
 	replyWith(t, proj, 1, "edit")
-	env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+	env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`"}`)
 	if got := extractReason(t, env); got != distillationReason {
 		t.Fatalf("every=1 stop after one tool call = %q, want the distillation prompt", got)
 	}
@@ -591,10 +604,10 @@ func TestDistillationEveryZeroNeverPrompts(t *testing.T) {
 	proj := t.TempDir()
 	enableMemoryForTest(t)
 	setMemoryCapture(t, intPtr(0), nil)
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`"}`)
 
 	replyWith(t, proj, 50, "edit")
-	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+proj+`"}`); env != "" {
+	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"e","cwd":"`+js(proj)+`"}`); env != "" {
 		t.Errorf("every=0 stop emitted %q, want empty (off)", env)
 	}
 }
@@ -604,9 +617,9 @@ func TestCheckpointZeroNeverCheckpoints(t *testing.T) {
 	proj := t.TempDir()
 	enableMemoryForTest(t)
 	setMemoryCapture(t, nil, intPtr(0))
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"c0","cwd":"`+proj+`"}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"c0","cwd":"`+js(proj)+`"}`)
 	for i := 0; i < 40; i++ {
-		if env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"c0","cwd":"`+proj+`","tool_name":"edit"}`); env != "" {
+		if env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"c0","cwd":"`+js(proj)+`","tool_name":"edit"}`); env != "" {
 			t.Fatalf("checkpoint=0 tool-use %d emitted %q, want empty (off)", i, env)
 		}
 	}
@@ -617,14 +630,14 @@ func TestCheckpointIgnoresMemoryServerToolCalls(t *testing.T) {
 	proj := t.TempDir()
 	enableMemoryForTest(t)
 	setMemoryCapture(t, nil, intPtr(2))
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"cm","cwd":"`+proj+`"}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"cm","cwd":"`+js(proj)+`"}`)
 	for i := 0; i < 5; i++ {
-		hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cm","cwd":"`+proj+`","tool_name":"mcp__agent-brain-memory__memory_save"}`)
+		hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cm","cwd":"`+js(proj)+`","tool_name":"mcp__agent-brain-memory__memory_save"}`)
 	}
-	if env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cm","cwd":"`+proj+`","tool_name":"edit"}`); env != "" {
+	if env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cm","cwd":"`+js(proj)+`","tool_name":"edit"}`); env != "" {
 		t.Fatalf("one real call after memory calls checkpointed early: %q", env)
 	}
-	env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cm","cwd":"`+proj+`","tool_name":"edit"}`)
+	env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cm","cwd":"`+js(proj)+`","tool_name":"edit"}`)
 	if got := extractReason(t, env); got != checkpointReason {
 		t.Fatalf("second real call reason = %q, want the checkpoint prompt", got)
 	}
@@ -635,13 +648,13 @@ func TestCheckpointConfiguredThresholdFires(t *testing.T) {
 	proj := t.TempDir()
 	enableMemoryForTest(t)
 	setMemoryCapture(t, nil, intPtr(4))
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"cc","cwd":"`+proj+`"}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"cc","cwd":"`+js(proj)+`"}`)
 	for i := 0; i < 3; i++ {
-		if env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cc","cwd":"`+proj+`","tool_name":"edit"}`); env != "" {
+		if env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cc","cwd":"`+js(proj)+`","tool_name":"edit"}`); env != "" {
 			t.Fatalf("tool-use %d emitted %q below configured checkpoint 4", i, env)
 		}
 	}
-	env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cc","cwd":"`+proj+`","tool_name":"edit"}`)
+	env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cc","cwd":"`+js(proj)+`","tool_name":"edit"}`)
 	if got := extractReason(t, env); got != checkpointReason {
 		t.Errorf("fourth tool-use reason = %q, want the checkpoint prompt", got)
 	}
@@ -655,18 +668,18 @@ func TestCheckpointSkipsSubagentToolCalls(t *testing.T) {
 	proj := t.TempDir()
 	enableMemoryForTest(t)
 	setMemoryCapture(t, nil, intPtr(3))
-	hookWith(t, "session-start", "claude-code", `{"session_id":"sa","cwd":"`+proj+`"}`)
+	hookWith(t, "session-start", "claude-code", `{"session_id":"sa","cwd":"`+js(proj)+`"}`)
 	for i := 0; i < 10; i++ {
-		if env := hookWith(t, "tool-use", "claude-code", `{"session_id":"sa","cwd":"`+proj+`","tool_name":"Edit","agent_id":"a1b2c3"}`); env != "" {
+		if env := hookWith(t, "tool-use", "claude-code", `{"session_id":"sa","cwd":"`+js(proj)+`","tool_name":"Edit","agent_id":"a1b2c3"}`); env != "" {
 			t.Fatalf("subagent tool-use %d emitted %q, want empty", i, env)
 		}
 	}
 	for i := 0; i < 2; i++ {
-		if env := hookWith(t, "tool-use", "claude-code", `{"session_id":"sa","cwd":"`+proj+`","tool_name":"Edit"}`); env != "" {
+		if env := hookWith(t, "tool-use", "claude-code", `{"session_id":"sa","cwd":"`+js(proj)+`","tool_name":"Edit"}`); env != "" {
 			t.Fatalf("parent tool-use %d emitted %q: subagent calls counted toward the threshold", i, env)
 		}
 	}
-	env := hookWith(t, "tool-use", "claude-code", `{"session_id":"sa","cwd":"`+proj+`","tool_name":"Edit"}`)
+	env := hookWith(t, "tool-use", "claude-code", `{"session_id":"sa","cwd":"`+js(proj)+`","tool_name":"Edit"}`)
 	if got := extractReason(t, env); got != checkpointReason {
 		t.Fatalf("third parent tool-use reason = %q, want the checkpoint prompt", got)
 	}
@@ -690,8 +703,8 @@ func TestPreCompactCheckpointStillFiresAtThresholdOne(t *testing.T) {
 	proj := t.TempDir()
 	enableMemoryForTest(t)
 	setMemoryCapture(t, nil, intPtr(25))
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"pc","cwd":"`+proj+`"}`)
-	hookWith(t, "tool-use", "gemini-cli", `{"session_id":"pc","cwd":"`+proj+`","tool_name":"edit"}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"pc","cwd":"`+js(proj)+`"}`)
+	hookWith(t, "tool-use", "gemini-cli", `{"session_id":"pc","cwd":"`+js(proj)+`","tool_name":"edit"}`)
 
 	// The pre-compact path calls checkpointCapture with threshold 1 directly, so
 	// it must fire on one real call even when the tool-use trigger is at 25.
@@ -715,8 +728,8 @@ func TestDistillationSilentWithoutActivity(t *testing.T) {
 	proj := t.TempDir()
 	enableMemoryForTest(t)
 	// session-start + stop, but no prompt and no tool-use.
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"n","cwd":"`+proj+`"}`)
-	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"n","cwd":"`+proj+`"}`); env != "" {
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"n","cwd":"`+js(proj)+`"}`)
+	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"n","cwd":"`+js(proj)+`"}`); env != "" {
 		t.Errorf("no-activity stop emitted %q, want empty", env)
 	}
 }
@@ -725,10 +738,10 @@ func TestDistillationSilentWhenMemoryGated(t *testing.T) {
 	sandbox(t)
 	proj := t.TempDir()
 	// Memory off: even with activity, no distillation.
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"m","cwd":"`+proj+`"}`)
-	hookWith(t, "prompt", "gemini-cli", `{"session_id":"m","cwd":"`+proj+`"}`)
-	hookWith(t, "tool-use", "gemini-cli", `{"session_id":"m","cwd":"`+proj+`","tool_name":"edit"}`)
-	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"m","cwd":"`+proj+`"}`); env != "" {
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"m","cwd":"`+js(proj)+`"}`)
+	hookWith(t, "prompt", "gemini-cli", `{"session_id":"m","cwd":"`+js(proj)+`"}`)
+	hookWith(t, "tool-use", "gemini-cli", `{"session_id":"m","cwd":"`+js(proj)+`","tool_name":"edit"}`)
+	if env := hookWith(t, "stop", "gemini-cli", `{"session_id":"m","cwd":"`+js(proj)+`"}`); env != "" {
 		t.Errorf("gated stop emitted %q, want empty", env)
 	}
 }
@@ -756,7 +769,7 @@ func TestCheckpointFiresOnToolThreshold(t *testing.T) {
 			checkpointToolThreshold = 3
 			t.Cleanup(func() { checkpointToolThreshold = restore })
 
-			fill := func(s string) string { return strings.ReplaceAll(s, "%s", proj) }
+			fill := func(s string) string { return strings.ReplaceAll(s, "%s", jsonPath(proj)) }
 			hookWith(t, "session-start", tc.name, fill(tc.start))
 
 			// First two tool-uses are below threshold: silent.
@@ -785,8 +798,8 @@ func TestCheckpointSilentWhenMemoryGated(t *testing.T) {
 	checkpointToolThreshold = 1
 	t.Cleanup(func() { checkpointToolThreshold = restore })
 	// Memory off: even at threshold, no checkpoint.
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"cg","cwd":"`+proj+`"}`)
-	if env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cg","cwd":"`+proj+`","tool_name":"edit"}`); env != "" {
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"cg","cwd":"`+js(proj)+`"}`)
+	if env := hookWith(t, "tool-use", "gemini-cli", `{"session_id":"cg","cwd":"`+js(proj)+`","tool_name":"edit"}`); env != "" {
 		t.Errorf("gated tool-use emitted %q, want empty", env)
 	}
 }
@@ -811,8 +824,8 @@ func TestReconcileNeverParsesForeignTranscripts(t *testing.T) {
 	if err := os.WriteFile(transcript, []byte(`{"someGeminiShape":true}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	hookWith(t, "session-start", "gemini-cli", `{"session_id":"stale1","cwd":"`+proj+`","transcript_path":"`+transcript+`"}`)
-	hookWith(t, "model-usage", "gemini-cli", `{"session_id":"stale1","cwd":"`+proj+`","llm_request":{"model":"gemini-2.5-pro"},"llm_response":{"usageMetadata":{"promptTokenCount":70,"candidatesTokenCount":30,"cachedContentTokenCount":5}}}`)
+	hookWith(t, "session-start", "gemini-cli", `{"session_id":"stale1","cwd":"`+js(proj)+`","transcript_path":"`+js(transcript)+`"}`)
+	hookWith(t, "model-usage", "gemini-cli", `{"session_id":"stale1","cwd":"`+js(proj)+`","llm_request":{"model":"gemini-2.5-pro"},"llm_response":{"usageMetadata":{"promptTokenCount":70,"candidatesTokenCount":30,"cachedContentTokenCount":5}}}`)
 
 	st := openTestStore(t)
 	stale := time.Now().UTC().Add(-5 * time.Hour).Format(store.TimeLayout)
