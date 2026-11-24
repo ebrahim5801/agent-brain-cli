@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://brain.ohnopixel.com/sitemap.xml

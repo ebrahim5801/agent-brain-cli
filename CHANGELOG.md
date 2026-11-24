@@ -9,18 +9,16 @@
   of 0.5.13 check agentbrain.sync.com.lb and return to this channel only once
   this release is published there too.
 
+## 0.5.13 - 2026-11-24
+
+### Changed
+
+- The site and installers are published at https://agentbrain.sync.com.lb. The former address, agentbrain.wecansync.com, keeps serving the installers and releases, so installed binaries keep updating; its pages redirect to the new address. Builds from now on update from the new address.
+- Built with Go 1.26.11, which also fixes GO-2026-6859 (net/http). go.mod pins `toolchain go1.26.11`, and golang.org/x/text moves to v0.44.0.
+
 ### Fixed
 
-- A session that changes into a nested git clone keeps the session handle it
-  started with. Hooks fired there used to get a new handle that the MCP server
-  rejected ("session attribution does not match project or checkout"), and the
-  Stop checkpoint then blocked on every stop.
-
-### Security
-
-- Built with Go 1.26.11, which fixes GO-2026-6809 (crypto/x509) and
-  GO-2026-6859 (net/http). go.mod pins `toolchain go1.26.11`, and
-  golang.org/x/text moves to v0.44.0.
+- A session that changes into a nested git clone keeps the session handle it started with. Hooks fired there used to get a new handle that the MCP server rejected ("session attribution does not match project or checkout"), and the Stop checkpoint then blocked on every stop.
 
 ## 0.5.12 - 2026-10-27
 

@@ -89,6 +89,10 @@ rsync -rt --chmod=D755,F644 dist/site/releases/0.5.14 "$SITE/releases/"
 rsync -rt --chmod=D755,F644 --exclude 'releases/0.5.14' dist/site/ "$SITE/"
 ```
 
+0.5.13 was published only at agentbrain.sync.com.lb (agentbrain.wecansync.com
+redirects there), and its binaries update from that site. Those installs move
+back to brain.ohnopixel.com only when a later release is published there too.
+
 ## 4. Publish to the update server
 
 Installs of 0.5.3 and earlier, and builds made without `-update-url`, read the
