@@ -18,6 +18,10 @@ func TestApply(t *testing.T) {
 	}{
 		{"short URL password", "postgres://user:abc@localhost/db", "postgres://user:[redacted:url-credential]@localhost/db"},
 		{"JSON credential", `{"api_key": "synthetic-secret-123"}`, `{"api_key": "[redacted:credential]"}`},
+		{"prefixed JSON token", `{"memory_token": "synthetic-memory-123"}`, `{"memory_token": "[redacted:credential]"}`},
+		{"prefixed env token", "MEMORY_TOKEN=synthetic-memory-123", "MEMORY_TOKEN=[redacted:credential]"},
+		{"refresh token", "refresh_token: synthetic-refresh-123", "refresh_token: [redacted:credential]"},
+		{"token counts are not secrets", "max_tokens: 40960000 input_tokens=12345678", "max_tokens: 40960000 input_tokens=12345678"},
 		{"aws key", "the key is AKIAIOSFODNN7EXAMPLE ok", "the key is [redacted:aws-key] ok"},
 		{"github token", "use ghp_abcdefghij1234567890KLMNOP here", "use [redacted:github-token] here"},
 		{"gitlab token", "glpat-AbCdEf123456789012345 works", "[redacted:gitlab-token] works"},

@@ -507,6 +507,40 @@ td code.il, th code.il { white-space: nowrap; }
 .faq-item p { color: var(--text-muted); padding-bottom: 1.1rem; margin: 0; }
 
 /* --------------------------------------------------------------------------
+   Changelog / version history
+   -------------------------------------------------------------------------- */
+.release-card {
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.5rem; margin: 1.5rem 0 2rem;
+}
+.release-card > p { margin: 0; }
+.release-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .6rem; margin-bottom: .6rem; }
+.release-version { font-family: var(--font-mono); font-weight: 700; font-size: 1.05rem; color: var(--accent); }
+.release-date { color: var(--text-muted); font-size: .88rem; }
+.release-list { margin: .75rem 0 0; padding-left: 1.3rem; color: var(--text-muted); font-size: .93rem; }
+.release-list li { margin-bottom: .5rem; }
+.release-list li:last-child { margin-bottom: 0; }
+
+.version-history-heading { margin-top: 0; }
+.version-history { border-top: 1px solid var(--border); }
+.version-item { border-bottom: 1px solid var(--border); }
+.version-item summary {
+  cursor: pointer; list-style: none; padding: 1rem 1.6rem 1rem 0; position: relative;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem .6rem;
+}
+.version-item summary::-webkit-details-marker { display: none; }
+.version-item summary::after {
+  content: "+"; font-weight: 400; font-size: 1.3rem; color: var(--text-faint);
+  position: absolute; right: 0; top: .85rem;
+}
+.version-item[open] summary::after { content: "\2212"; }
+.version-item .version-summary { color: var(--text-muted); font-size: .9rem; flex-basis: 100%; }
+@media (min-width: 640px) {
+  .version-item .version-summary { flex-basis: auto; }
+}
+.version-item .release-list { margin-top: 0; padding-bottom: 1.1rem; }
+
+/* --------------------------------------------------------------------------
    Anchor headings (self-links used throughout docs)
    -------------------------------------------------------------------------- */
 main section[id], .docs-main section[id] { scroll-margin-top: 5.5rem; }
