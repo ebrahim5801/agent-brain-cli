@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>agent-brain — local stats and memory for AI coding assistants</title>
+<link rel="canonical" href="https://agentbrain.sync.com.lb/">
+<meta property="og:url" content="https://agentbrain.sync.com.lb/">
 <meta name="description" content="agent-brain records how you use Claude Code, Cursor, GitHub Copilot CLI, Gemini CLI, OpenCode and Codex CLI, locally and offline. Install with one command on macOS, Linux or Windows.">
 <meta property="og:title" content="agent-brain">
 <meta property="og:description" content="Local stats and memory for AI coding assistants. One command to install. Stats are free, local and offline.">
@@ -28,6 +30,7 @@
       <a href="#quick-start">Quick start</a>
       <a href="#plans">Free vs Pro</a>
       <a href="#faq">FAQ</a>
+      <a href="#changelog">Changelog</a>
       <a href="/docs/">Docs</a>
       <a href="https://github.com/ebrahim5801/agent-brain-cli">GitHub</a>
     </nav>
@@ -52,7 +55,7 @@
       <p class="eyebrow">Local stats and memory for AI coding assistants</p>
       <h1>See what your AI assistants really cost, and let them remember</h1>
       <p class="lede">agent-brain runs on your machine. It records sessions, tokens and cost across your coding assistants, and gives them project memory they can search and save. Nothing leaves your machine unless you link a project and consent.</p>
-      <p class="latest-badge"><span class="latest-badge-version" data-latest-version>v0.5.3</span> <span aria-hidden="true">&middot;</span> <a href="/docs/#updating">Updating</a></p>
+      <p class="latest-badge"><span class="latest-badge-version" data-latest-version>v0.5.12</span> <span aria-hidden="true">&middot;</span> <a href="#changelog">What's new</a> <span aria-hidden="true">&middot;</span> <a href="/docs/#updating">Updating</a></p>
 
       <div class="tabs" id="install-tabs">
         <div role="tablist" aria-label="Operating system">
@@ -63,14 +66,14 @@
           <p class="panel-label">macOS and Linux</p>
           <div class="code-wrap">
             <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy macOS and Linux install command">Copy</button></div>
-            <pre><code>curl -fsSL https://agentbrain.wecansync.com/install.sh | sh</code></pre>
+            <pre><code>curl -fsSL https://agentbrain.sync.com.lb/install.sh | sh</code></pre>
           </div>
         </div>
         <div role="tabpanel" id="panel-win" aria-labelledby="tab-win">
           <p class="panel-label">Windows PowerShell</p>
           <div class="code-wrap">
             <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy Windows install command">Copy</button></div>
-            <pre><code>irm https://agentbrain.wecansync.com/install.ps1 | iex</code></pre>
+            <pre><code>irm https://agentbrain.sync.com.lb/install.ps1 | iex</code></pre>
           </div>
         </div>
       </div>
@@ -112,8 +115,8 @@
       </article>
       <article class="feature-card">
         <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3a3 3 0 0 0-3 3v1a3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3zM15 3a3 3 0 0 1 3 3v1a3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-3 3 3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z"/></svg></span>
-        <h3>Memory (Pro)</h3>
-        <p>Assistants get <code class="il">memory_search</code> and <code class="il">memory_save</code> tools over MCP, plus project memory injected at session start. Entries are typed as decisions, conventions, task state or facts.</p>
+        <h3>Memory</h3>
+        <p>Assistants get <code class="il">memory_search</code> and <code class="il">memory_save</code> tools over MCP, plus project memory injected at session start. Entries are typed as decisions, conventions, task state or facts. Free, local, no account: turn it on with <code class="il">agent-brain memory enable</code>.</p>
       </article>
       <article class="feature-card">
         <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
@@ -182,25 +185,25 @@
     <div class="section-head">
       <p class="eyebrow">Free vs Pro</p>
       <h2 id="plans-title">What is free, and what needs an account</h2>
-      <p>The local tool is free and needs no account. Memory needs Pro, and the cloud dashboard is optional.</p>
+      <p>The local tool, including personal memory, is free and needs no account. The cloud dashboard and team memory are optional.</p>
     </div>
     <div class="plan-grid">
       <article class="plan-card">
         <span class="plan-tag">Free</span>
-        <h3>Local collection and stats</h3>
+        <h3>Local collection, stats and memory</h3>
         <ul>
           <li>Session capture for every supported assistant</li>
           <li><code class="il">agent-brain stats</code> and <code class="il">agent-brain status</code></li>
+          <li>Personal memory: <code class="il">memory_search</code>, <code class="il">memory_save</code> and session-start memory, after <code class="il">agent-brain memory enable</code></li>
           <li>Local, offline, no account</li>
         </ul>
       </article>
       <article class="plan-card">
         <span class="plan-tag">Pro</span>
-        <h3>Memory, and the optional cloud dashboard</h3>
+        <h3>The optional cloud: dashboard and team memory</h3>
         <ul>
-          <li>Memory tools (<code class="il">memory_search</code>, <code class="il">memory_save</code>) and session-start memory injection</li>
-          <li>Available with a Pro account (<code class="il">agent-brain login</code>) or through membership of a paying team's project</li>
-          <li>The cloud dashboard is optional: <code class="il">agent-brain login</code>, then <code class="il">agent-brain link &lt;project-key&gt;</code>, then consent</li>
+          <li>Team memory, shared through membership of a paying team's project</li>
+          <li>The cloud dashboard: <code class="il">agent-brain login</code>, then <code class="il">agent-brain link &lt;project-key&gt;</code>, then consent</li>
         </ul>
       </article>
     </div>
@@ -219,7 +222,7 @@
       </details>
       <details class="faq-item">
         <summary>Do I need an account?</summary>
-        <p>No. Collection, <code class="il">agent-brain stats</code> and <code class="il">agent-brain status</code> are local and need no account. Memory needs a Pro account or team membership, and the cloud dashboard is optional.</p>
+        <p>No. Collection, <code class="il">agent-brain stats</code>, <code class="il">agent-brain status</code> and personal memory are local and need no account. Team memory needs membership of a paying team's project, and the cloud dashboard is optional.</p>
       </details>
       <details class="faq-item">
         <summary>Does it slow my assistant down?</summary>
@@ -242,6 +245,131 @@
   </div>
 </section>
 
+<!-- ============================== CHANGELOG ============================== -->
+<section class="section section-alt" id="changelog" aria-labelledby="changelog-title">
+  <div class="container container-narrow">
+    <p class="eyebrow">What's new</p>
+    <h2 id="changelog-title">Latest release</h2>
+
+    <div class="release-card">
+      <div class="release-head">
+        <span class="release-version">v0.5.12</span>
+        <span class="release-date">October 27, 2026</span>
+      </div>
+      <p>Clean up after one session without turning memory off.</p>
+      <ul class="release-list">
+        <li><code class="il">agent-brain memory show ID</code> shows which session saved an entry.</li>
+        <li><code class="il">agent-brain memory list --session ID</code> lists everything that session saved, and <code class="il">agent-brain memory delete --session ID</code> removes it after showing you each entry.</li>
+        <li>The delete also brings back older entries the session had replaced, and every entry can be restored.</li>
+      </ul>
+    </div>
+
+    <h3 class="version-history-heading">Version history</h3>
+    <div class="version-history">
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.11</span><span class="release-date">October 22, 2026</span><span class="version-summary">Memory works from the first session, and you can browse it in Obsidian.</span></summary>
+        <ul class="release-list">
+          <li>A new memory store starts in the current format, so session capture and summaries work straight away. <code class="il">agent-brain memory enable</code> upgrades an existing one, after copying it to a backup file.</li>
+          <li><code class="il">agent-brain memory export --format obsidian --out FOLDER</code> writes your memories as linked notes. Open the folder in Obsidian to see them as a graph.</li>
+          <li>Updates and upgrades restart the background sync service, so it no longer keeps running the old version.</li>
+        </ul>
+      </details>
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.10</span><span class="release-date">October 21, 2026</span><span class="version-summary">Take a project's memories to another machine, or share them with a colleague.</span></summary>
+        <ul class="release-list">
+          <li><code class="il">agent-brain memory export --format json</code> writes a file, and <code class="il">agent-brain memory import</code> adds it to the same project on the other side.</li>
+          <li>The import shows what it will add and asks first. Entries already there are skipped, so importing twice adds nothing.</li>
+          <li>The file holds no sessions, transcripts or local paths. Imported entries start unverified and never retire an entry already on the machine.</li>
+        </ul>
+      </details>
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.9</span><span class="release-date">October 21, 2026</span><span class="version-summary">A security update.</span></summary>
+        <ul class="release-list">
+          <li>Built with Go 1.26.10, which no longer trusts some compromised intermediate certificates (GO-2026-6809). agent-brain checks certificates when it updates itself and when it talks to the cloud server.</li>
+        </ul>
+      </details>
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.8</span><span class="release-date">October 21, 2026</span><span class="version-summary">Memory costs fewer tokens and stays current.</span></summary>
+        <ul class="release-list">
+          <li>"Nothing to save" is one call, and the periodic memory request waits longer each time there was nothing to save.</li>
+          <li>An entry the assistant replaced is no longer injected next to its replacement, and task notes stop being injected after 30 days unless critical.</li>
+          <li>The injected memory is shorter: whole entries only, without routine labels.</li>
+          <li><code class="il">agent-brain memory export</code> writes your memories as Markdown.</li>
+          <li><code class="il">memory_save</code> accepts a <code class="il">memory_source_reference</code> result as evidence, and every tool says whether it only reads.</li>
+        </ul>
+      </details>
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.7</span><span class="release-date">October 20, 2026</span><span class="version-summary">Personal memory is free.</span></summary>
+        <ul class="release-list">
+          <li><code class="il">agent-brain memory enable</code> turns memory on with no account or plan: one consent step, and memories stay on your machine.</li>
+          <li>Team memory, sharing and the cloud dashboard still need a signed-in account.</li>
+          <li><code class="il">agent-brain status</code> shows memory as off or active, without contacting the server.</li>
+        </ul>
+      </details>
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.6</span><span class="release-date">October 16, 2026</span><span class="version-summary">Memory capture keeps working when the assistant changes folders.</span></summary>
+        <ul class="release-list">
+          <li>A Claude Code session keeps one memory handle when its shell changes folder. Before, each <code class="il">cd</code> into a subfolder gave it a new handle that the memory tools then rejected.</li>
+          <li>The end-of-reply memory request is not repeated while an earlier one is still unanswered, so an assistant that cannot act on it is no longer blocked at every reply.</li>
+          <li><code class="il">memory_capture_defer</code> can acknowledge a request that was never begun, and <code class="il">memory_capture_status</code> returns a result Claude Code accepts.</li>
+          <li><code class="il">usage_stats</code> counts all of a session's tokens, including sessions an earlier version split by folder.</li>
+          <li>Saved memories hide credential keys with a prefix, such as <code class="il">memory_token</code> or <code class="il">refresh_token</code>.</li>
+        </ul>
+      </details>
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.5</span><span class="release-date">October 15, 2026</span><span class="version-summary">agent-brain works on Windows.</span></summary>
+        <ul class="release-list">
+          <li>Claude Code hooks now run on Windows. They failed before, so no usage, sessions or memories were recorded. Run <code class="il">agent-brain install</code> to rewrite them; <code class="il">agent-brain status</code> flags the old form.</li>
+          <li>The store no longer fails to open with "database is locked" when several hooks start at once.</li>
+          <li>Saving settings on Windows retries briefly when another program has the file open, instead of failing with "Access is denied".</li>
+        </ul>
+      </details>
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.4</span><span class="release-date">October 15, 2026</span><span class="version-summary">Updates can come from a release site.</span></summary>
+        <ul class="release-list">
+          <li>A build can update from a release site instead of the cloud server, using <code class="il">AGENT_BRAIN_UPDATE_URL</code>. Downloads are still checked against the release checksum, and only <code class="il">https://</code> sites are used.</li>
+          <li><code class="il">agent-brain update</code> now says which site it checks.</li>
+        </ul>
+      </details>
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.3</span><span class="release-date">October 15, 2026</span><span class="version-summary">A clearer answer for empty filtered memory lists.</span></summary>
+        <ul class="release-list">
+          <li>Listing memories with a priority or kind filter on a project with no memories now says there are none, instead of "no memories on this page".</li>
+        </ul>
+      </details>
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.2</span><span class="release-date">October 15, 2026</span><span class="version-summary">Memory lists are shown 50 at a time.</span></summary>
+        <ul class="release-list">
+          <li><code class="il">agent-brain memory list</code> and the <code class="il">memory_list</code> tool show the newest 50 memories and say how to get the next page.</li>
+          <li>Use <code class="il">--limit N</code> and <code class="il">--offset N</code> to page; <code class="il">--limit 0</code> lists everything.</li>
+        </ul>
+      </details>
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.1</span><span class="release-date">October 15, 2026</span><span class="version-summary">Token usage for Claude Code mods, and no cloud question at session start.</span></summary>
+        <ul class="release-list">
+          <li>A new read-only <code class="il">usage_stats</code> tool reports this machine's token usage for one session, today and this week. It works without memory and reads only local data.</li>
+          <li>The question about linking a project to agent-brain cloud is off by default. <code class="il">agent-brain config link-offer on</code> brings it back.</li>
+        </ul>
+      </details>
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.0</span><span class="release-date">October 14, 2026</span><span class="version-summary">Memory V2: more reliable capture and better recall.</span></summary>
+        <ul class="release-list">
+          <li>Memory capture is tracked per session, so saves are not duplicated and recover after a crash or retry. Existing memories are unchanged.</li>
+          <li>Search ranks memories by relevance and current decisions, and you can roll back to the earlier behaviour.</li>
+          <li>Opt-in upgrade: back up first, update every hook, MCP and daemon build, and restart your assistants. Do not go back to a pre-V2 build afterwards.</li>
+        </ul>
+      </details>
+      <details class="version-item">
+        <summary><span class="release-version">v0.4.0</span><span class="release-date">October 14, 2026</span><span class="version-summary">First release of the open-source agent-brain CLI, with prebuilt binaries.</span></summary>
+        <ul class="release-list">
+          <li>One-line installers for macOS, Linux and Windows PowerShell that need no Go toolchain and verify the download against its checksum.</li>
+          <li>The end-of-reply memory request now fires after 10 tool calls of work instead of after almost every reply. <code class="il">agent-brain memory capture</code> shows and changes this; <code class="il">--every 1</code> restores the old behaviour.</li>
+          <li>Claude Code subagents no longer receive the mid-task memory checkpoint. The project is now under the MIT License.</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+</section>
 
 </main>
 
@@ -254,6 +382,7 @@
       </a>
       <nav class="footer-links" aria-label="Footer">
         <a href="/docs/">Docs</a>
+        <a href="#changelog">Changelog</a>
         <a href="https://github.com/ebrahim5801/agent-brain-cli">Source</a>
         <a href="https://github.com/ebrahim5801/agent-brain-cli/blob/main/SECURITY.md">Security</a>
         <a href="https://github.com/ebrahim5801/agent-brain-cli/blob/main/LICENSE">License</a>

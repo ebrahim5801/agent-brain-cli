@@ -11,13 +11,13 @@ CPU, checks its SHA-256 checksum, installs it to `~/.local/bin`, and offers to
 run `agent-brain install` for you. No Go toolchain is needed:
 
 ```sh
-curl -fsSL https://agentbrain.wecansync.com/install.sh | sh
+curl -fsSL https://agentbrain.sync.com.lb/install.sh | sh
 ```
 
-On Windows, in PowerShell: `irm https://agentbrain.wecansync.com/install.ps1 | iex`
+On Windows, in PowerShell: `irm https://agentbrain.sync.com.lb/install.ps1 | iex`
 (it installs to `%LOCALAPPDATA%\Programs\agent-brain`).
 
-To build from source instead (requires Go 1.25+):
+To build from source instead (requires Go 1.26+):
 
 ```sh
 git clone https://github.com/ebrahim5801/agent-brain-cli.git
@@ -92,7 +92,10 @@ machine — the sync protocol has no fields for them.
 To stop: `agent-brain unlink` (one project), `agent-brain consent withdraw`
 (all transmission), `agent-brain logout` (the machine).
 
-## 5. Optional: memory (Pro)
+## 5. Optional: memory
+
+Personal memory is free and needs no account: it is stored only on this
+machine.
 
 ```sh
 agent-brain memory enable

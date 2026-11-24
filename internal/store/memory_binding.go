@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
+	"github.com/ebrahim5801/agent-brain-cli/internal/attribution"
 	"github.com/google/uuid"
 )
 
@@ -34,6 +36,22 @@ func CheckoutIdentity(dir string) string {
 	return filepath.Clean(abs)
 }
 
+// checkoutRoot is the root of the git checkout dir lies in, or dir itself
+// outside git. Bindings store the folder a session started in; they are
+// matched by checkout root, so a hook whose folder followed the shell's `cd`
+// (or a binding 0.5.5 stored for a subfolder) still names the same session.
+func checkoutRoot(dir string) string {
+	dir = CheckoutIdentity(dir)
+	if root := attribution.RepoRoot(dir); root != "" {
+		return CheckoutIdentity(root)
+	}
+	return dir
+}
+
+func sameCheckout(stored, requested string) bool {
+	return checkoutRoot(stored) == checkoutRoot(requested)
+}
+
 // EnsureBoundSession serializes session creation across hook processes without
 // guessing from recency. A reused native ID in another project is independent.
 func (s *Store) EnsureBoundSession(projectID int64, assistant, native, checkout, transcript, parent string) (SessionBinding, error) {
@@ -53,15 +71,23 @@ func (s *Store) EnsureBoundSession(projectID int64, assistant, native, checkout,
 		return SessionBinding{}, err
 	}
 	b := SessionBinding{ProjectID: projectID, Assistant: assistant, NativeID: native, Checkout: checkout, ParentHandle: parent, Provenance: "native"}
-	err = tx.QueryRow(s.Rebind(`SELECT handle,session_id,COALESCE(parent_handle,'') FROM memory_session_bindings WHERE project_id=? AND assistant=? AND native_id=? AND checkout=?`), projectID, assistant, native, checkout).Scan(&b.Handle, &b.SessionID, &b.ParentHandle)
+	if parent == "" {
+		found, ok, err := enclosingBinding(tx, s, assistant, native, checkout)
+		if err != nil {
+			return SessionBinding{}, err
+		}
+		if ok {
+			b = found
+			b.Assistant, b.NativeID, b.Provenance = assistant, native, "native"
+			return b, s.reopenBoundSession(tx, b.SessionID, transcript)
+		}
+	}
+	err = s.findSessionBinding(tx, &b)
 	if err == nil {
 		if b.ParentHandle != parent {
 			return SessionBinding{}, ErrAttribution
 		}
-		if _, err := s.ExecTx(tx, `UPDATE sessions SET sync_dirty=1,transcript_path=COALESCE(NULLIF(?,''),transcript_path),ended_at=CASE WHEN end_reason='interrupted' THEN NULL ELSE ended_at END,end_reason=CASE WHEN end_reason='interrupted' THEN NULL ELSE end_reason END WHERE id=?`, transcript, b.SessionID); err != nil {
-			return SessionBinding{}, err
-		}
-		return b, tx.Commit()
+		return b, s.reopenBoundSession(tx, b.SessionID, transcript)
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return SessionBinding{}, err
@@ -69,7 +95,8 @@ func (s *Store) EnsureBoundSession(projectID int64, assistant, native, checkout,
 	var parentID any
 	if parent != "" {
 		var id int64
-		if err := tx.QueryRow(s.Rebind(`SELECT session_id FROM memory_session_bindings WHERE handle=? AND project_id=? AND checkout=?`), parent, projectID, checkout).Scan(&id); err != nil {
+		var parentCheckout string
+		if err := tx.QueryRow(s.Rebind(`SELECT session_id,checkout FROM memory_session_bindings WHERE handle=? AND project_id=?`), parent, projectID).Scan(&id, &parentCheckout); err != nil || !sameCheckout(parentCheckout, checkout) {
 			return SessionBinding{}, ErrAttribution
 		}
 		parentID = id
@@ -84,6 +111,75 @@ func (s *Store) EnsureBoundSession(projectID int64, assistant, native, checkout,
 		return SessionBinding{}, err
 	}
 	return b, tx.Commit()
+}
+
+func (s *Store) reopenBoundSession(tx *sql.Tx, sessionID int64, transcript string) error {
+	if _, err := s.ExecTx(tx, `UPDATE sessions SET sync_dirty=1,transcript_path=COALESCE(NULLIF(?,''),transcript_path),ended_at=CASE WHEN end_reason='interrupted' THEN NULL ELSE ended_at END,end_reason=CASE WHEN end_reason='interrupted' THEN NULL ELSE end_reason END WHERE id=?`, transcript, sessionID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// enclosingBinding finds the top-level binding of this native session whose
+// checkout is checkout itself or one of its parents, so a hook fired from a
+// nested clone keeps the handle issued where the session started. The
+// outermost match wins. Checkouts outside every bound folder stay independent.
+func enclosingBinding(tx *sql.Tx, s *Store, assistant, native, checkout string) (SessionBinding, bool, error) {
+	rows, err := tx.Query(s.Rebind(`SELECT handle,project_id,session_id,checkout FROM memory_session_bindings WHERE assistant=? AND native_id=? AND parent_handle IS NULL`), assistant, native)
+	if err != nil {
+		return SessionBinding{}, false, err
+	}
+	defer rows.Close()
+	var best SessionBinding
+	found := false
+	for rows.Next() {
+		var b SessionBinding
+		if err := rows.Scan(&b.Handle, &b.ProjectID, &b.SessionID, &b.Checkout); err != nil {
+			return SessionBinding{}, false, err
+		}
+		if !withinDir(b.Checkout, checkout) {
+			continue
+		}
+		if !found || len(b.Checkout) < len(best.Checkout) || (len(b.Checkout) == len(best.Checkout) && b.Handle < best.Handle) {
+			best, found = b, true
+		}
+	}
+	return best, found, rows.Err()
+}
+
+func withinDir(dir, path string) bool {
+	rel, err := filepath.Rel(dir, path)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel))
+}
+
+// findSessionBinding fills b from the binding of b's native session in b's
+// checkout. A row with the exact folder wins; otherwise the oldest row in the
+// same checkout is reused, so changing folders, or upgrading from 0.5.5, does
+// not split a running session.
+func (s *Store) findSessionBinding(tx *sql.Tx, b *SessionBinding) error {
+	rows, err := tx.Query(s.Rebind(`SELECT handle,session_id,COALESCE(parent_handle,''),checkout FROM memory_session_bindings WHERE project_id=? AND assistant=? AND native_id=? ORDER BY CASE WHEN checkout=? THEN 0 ELSE 1 END,created_at,handle`), b.ProjectID, b.Assistant, b.NativeID, b.Checkout)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var handle, parent, checkout string
+		var sessionID int64
+		if err := rows.Scan(&handle, &sessionID, &parent, &checkout); err != nil {
+			return err
+		}
+		if sameCheckout(checkout, b.Checkout) {
+			b.Handle, b.SessionID, b.ParentHandle = handle, sessionID, parent
+			return rows.Close()
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return sql.ErrNoRows
 }
 
 func (s *Store) lockProject(tx *sql.Tx, projectID int64) error {
@@ -108,11 +204,17 @@ func (s *Store) ResolveBinding(handle string, projectID int64, checkout string) 
 		return SessionBinding{}, ErrV2Required
 	}
 	var b SessionBinding
-	err := s.QueryRow(`SELECT handle,project_id,session_id,assistant,native_id,checkout,COALESCE(parent_handle,''),provenance FROM memory_session_bindings WHERE handle=? AND project_id=? AND checkout=?`, handle, projectID, CheckoutIdentity(checkout)).Scan(&b.Handle, &b.ProjectID, &b.SessionID, &b.Assistant, &b.NativeID, &b.Checkout, &b.ParentHandle, &b.Provenance)
+	err := s.QueryRow(`SELECT handle,project_id,session_id,assistant,native_id,checkout,COALESCE(parent_handle,''),provenance FROM memory_session_bindings WHERE handle=? AND project_id=?`, handle, projectID).Scan(&b.Handle, &b.ProjectID, &b.SessionID, &b.Assistant, &b.NativeID, &b.Checkout, &b.ParentHandle, &b.Provenance)
 	if errors.Is(err, sql.ErrNoRows) {
-		return b, ErrAttribution
+		return SessionBinding{}, ErrAttribution
 	}
-	return b, err
+	if err != nil {
+		return SessionBinding{}, err
+	}
+	if !sameCheckout(b.Checkout, checkout) {
+		return SessionBinding{}, ErrAttribution
+	}
+	return b, nil
 }
 
 func (s *Store) SetBoundSummary(b SessionBinding, summary string) error {

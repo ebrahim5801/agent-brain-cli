@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Docs — agent-brain</title>
+<link rel="canonical" href="https://agentbrain.sync.com.lb/docs/">
+<meta property="og:url" content="https://agentbrain.sync.com.lb/docs/">
 <meta name="description" content="Install, verify, stats, memory, cloud dashboard, storage, updating, uninstall, privacy and troubleshooting for agent-brain.">
 <meta property="og:title" content="agent-brain docs">
 <meta property="og:type" content="website">
@@ -52,7 +54,7 @@
       <li><a href="#install">Install</a></li>
       <li><a href="#verify">Verify</a></li>
       <li><a href="#stats">Stats</a></li>
-      <li><a href="#memory">Memory (Pro)</a></li>
+      <li><a href="#memory">Memory</a></li>
       <li><a href="#cloud">Cloud dashboard and team memory</a></li>
       <li><a href="#storage">Storage backends</a></li>
       <li><a href="#updating">Updating</a></li>
@@ -74,18 +76,18 @@
   <h3>macOS and Linux</h3>
   <div class="code-wrap">
     <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy macOS and Linux install command">Copy</button></div>
-    <pre><code>curl -fsSL https://agentbrain.wecansync.com/install.sh | sh</code></pre>
+    <pre><code>curl -fsSL https://agentbrain.sync.com.lb/install.sh | sh</code></pre>
   </div>
 
   <h3>Windows PowerShell</h3>
   <div class="code-wrap">
     <div class="code-head"><button class="copy-btn" type="button" aria-label="Copy Windows install command">Copy</button></div>
-    <pre><code>irm https://agentbrain.wecansync.com/install.ps1 | iex</code></pre>
+    <pre><code>irm https://agentbrain.sync.com.lb/install.ps1 | iex</code></pre>
   </div>
 
   <h3>What the installer does</h3>
   <ol>
-    <li>Downloads the prebuilt binary for your OS and CPU from <code class="il">https://agentbrain.wecansync.com/releases/</code>.</li>
+    <li>Downloads the prebuilt binary for your OS and CPU from <code class="il">https://agentbrain.sync.com.lb/releases/</code>.</li>
     <li>Checks its SHA-256 against the release's <code class="il">checksums.txt</code>.</li>
     <li>Installs it to <code class="il">~/.local/bin</code> (Windows: <code class="il">%LOCALAPPDATA%\Programs\agent-brain</code>).</li>
     <li>Runs <code class="il">agent-brain install</code> to integrate the assistants it finds. This step asks before changing anything unless <code class="il">AGENT_BRAIN_YES=1</code> is set.</li>
@@ -97,7 +99,7 @@
     <table>
       <thead><tr><th scope="col">Variable</th><th scope="col">Effect</th></tr></thead>
       <tbody>
-        <tr><td><code class="il">AGENT_BRAIN_VERSION=0.5.3</code></td><td>Pins a version instead of the latest.</td></tr>
+        <tr><td><code class="il">AGENT_BRAIN_VERSION=0.5.12</code></td><td>Pins a version instead of the latest.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_BIN_DIR=DIR</code></td><td>Picks the install folder.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_NO_INTEGRATE=1</code></td><td>Installs the binary only. Skips <code class="il">agent-brain install</code>.</td></tr>
         <tr><td><code class="il">AGENT_BRAIN_YES=1</code></td><td>Answers yes to prompts.</td></tr>
@@ -106,7 +108,7 @@
   </div>
 
   <h3 id="manual-download">Manual download</h3>
-  <p><code class="il">https://agentbrain.wecansync.com/releases/latest.json</code> names the current version and its files. Archives live at <code class="il">/releases/&lt;version&gt;/agent-brain_&lt;os&gt;_&lt;arch&gt;.tar.gz</code> (<code class="il">.zip</code> on Windows), with <code class="il">checksums.txt</code> alongside. <code>os</code> is <code class="il">linux</code>, <code class="il">darwin</code> or <code class="il">windows</code>. <code>arch</code> is <code class="il">amd64</code> or <code class="il">arm64</code>.</p>
+  <p><code class="il">https://agentbrain.sync.com.lb/releases/latest.json</code> names the current version and its files. Archives live at <code class="il">/releases/&lt;version&gt;/agent-brain_&lt;os&gt;_&lt;arch&gt;.tar.gz</code> (<code class="il">.zip</code> on Windows), with <code class="il">checksums.txt</code> alongside. <code>os</code> is <code class="il">linux</code>, <code class="il">darwin</code> or <code class="il">windows</code>. <code>arch</code> is <code class="il">amd64</code> or <code class="il">arm64</code>.</p>
   <div class="table-wrap" data-latest-table>
     <table>
       <thead><tr><th scope="col">OS</th><th scope="col">CPU</th><th scope="col">File</th><th scope="col">SHA-256</th></tr></thead>
@@ -173,9 +175,9 @@ agent-brain install</code></pre>
 
 <!-- ============================== MEMORY ============================== -->
 <section id="memory" aria-labelledby="memory-title">
-  <p class="eyebrow docs-eyebrow">Pro</p>
-  <h2 id="memory-title">Memory (Pro)</h2>
-  <p>Assistants forget everything between sessions. agent-brain gives them an MCP server with two tools, <code class="il">memory_search</code> and <code class="il">memory_save</code>, plus a session-start hook that injects the most relevant entries. Memory needs a Pro account (<code class="il">agent-brain login</code>) or membership in a paying team's project.</p>
+  <p class="eyebrow docs-eyebrow">Free</p>
+  <h2 id="memory-title">Memory</h2>
+  <p>Assistants forget everything between sessions. agent-brain gives them an MCP server with two tools, <code class="il">memory_search</code> and <code class="il">memory_save</code>, plus a session-start hook that injects the most relevant entries. Personal memory is free and local: it needs no account, only your consent through <code class="il">agent-brain memory enable</code>. Team memory needs membership in a paying team's project.</p>
   <p>Entries are typed as <code class="il">decision</code>, <code class="il">convention</code>, <code class="il">task_state</code> or <code class="il">fact</code>. Each one records the git state it was captured at. Ranking flags stale entries rather than trusting them silently.</p>
 
   <h3>Turn memory on or off</h3>
@@ -189,10 +191,14 @@ agent-brain install</code></pre>
   <h3>Inspect and edit entries</h3>
   <div class="cmd-ref">
     <div class="cmd-ref-item"><code class="il">agent-brain memory list</code><p>Lists this project's entries, active first and newest first: 50 per page by default. Use <code class="il">--limit N</code> and <code class="il">--offset N</code> to page, or <code class="il">--limit 0</code> for all; <code class="il">--kind</code>, <code class="il">--priority</code> and <code class="il">--critical</code> filter before paging. <code class="il">--all</code> includes superseded and deleted entries.</p></div>
-    <div class="cmd-ref-item"><code class="il">agent-brain memory show ID</code><p>Shows one entry in full.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory show ID</code><p>Shows one entry in full, including the session that saved it.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory list --session ID</code><p>Lists the entries one session saved. The first 8 characters of its ID are enough.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory export</code><p>Writes this project's memories as Markdown to read or keep. <code class="il">--format json</code> writes the file <code class="il">memory import</code> reads, to move them to another machine or a colleague; <code class="il">--out FILE</code> writes a file only you can read, and <code class="il">--all</code> adds retired entries. <code class="il">--format obsidian --out FOLDER</code> writes one linked note per memory, to open as an Obsidian vault.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory import FILE</code><p>Adds a JSON export's entries to the project in the current folder. It shows what it will add and asks first; <code class="il">--dry-run</code> shows the summary only and <code class="il">--yes</code> imports without asking. The file must come from the same project (same git remote); <code class="il">--into-current-project</code> overrides that for a project without a remote. Entries already present are skipped, imported entries start unverified, and an import never retires an entry already on the machine.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain memory edit ID</code><p>Edits an entry's content in <code class="il">$EDITOR</code>, or pass <code class="il">--content</code>.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain memory priority ID critical|normal|background</code><p>Reclassifies how hard an entry competes for the session-start memory budget.</p></div>
-    <div class="cmd-ref-item"><code class="il">agent-brain memory delete ID</code><p>Permanently deletes an entry.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory delete ID</code><p>Deletes an entry; <code class="il">memory restore</code> brings it back.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain memory delete --session ID</code><p>Deletes everything one session saved and brings back the older entries it had replaced. It shows each entry and asks first.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain memory restore ID</code><p>Re-activates a superseded or deleted entry.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain memory wipe</code><p>Deletes all memory for this project. Each entry can still be restored.</p></div>
   </div>
@@ -251,9 +257,9 @@ agent-brain link &lt;project-key&gt;     # once per project, inside its director
 <section id="updating" aria-labelledby="updating-title">
   <p class="eyebrow docs-eyebrow">Maintenance</p>
   <h2 id="updating-title">Updating</h2>
-  <p>agent-brain updates itself in the background by default. You can also run the commands yourself:</p>
+  <p>agent-brain updates itself in the background by default. Installs from this site (0.5.4 and later) get their updates from this site; <code class="il">agent-brain update</code> names the site it checks. You can also run the commands yourself:</p>
   <div class="cmd-ref">
-    <div class="cmd-ref-item"><code class="il">agent-brain update</code><p>Fetches the latest release and replaces the binary.</p></div>
+    <div class="cmd-ref-item"><code class="il">agent-brain update</code><p>Fetches the latest release, replaces the binary and restarts a running background service.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain update --check</code><p>Reports whether an update is available, then exits.</p></div>
     <div class="cmd-ref-item"><code class="il">agent-brain update --auto on|notify|off</code><p>Sets automatic-update mode.</p></div>
   </div>
@@ -328,7 +334,7 @@ agent-brain uninstall --purge-data   # also removes the local data</code></pre>
     </details>
     <details class="faq-item">
       <summary>Do I need an account?</summary>
-      <p>No, for collection and <code class="il">agent-brain stats</code>. Memory needs a Pro account or team membership, and the cloud dashboard is optional.</p>
+      <p>No. Collection, <code class="il">agent-brain stats</code> and personal memory need no account. Team memory needs membership of a paying team's project, and the cloud dashboard is optional.</p>
     </details>
     <details class="faq-item">
       <summary>Does it slow my assistant down?</summary>

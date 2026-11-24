@@ -1,14 +1,14 @@
 #!/bin/sh
 # agent-brain installer for macOS and Linux.
 #
-#   curl -fsSL https://agentbrain.wecansync.com/install.sh | sh
+#   curl -fsSL https://agentbrain.sync.com.lb/install.sh | sh
 #
 # Downloads the prebuilt binary for this OS and CPU, checks it against the
 # release's checksums.txt, installs it, then offers to run `agent-brain
 # install` to integrate your coding assistants. No Go toolchain is needed.
 #
 # Environment:
-#   AGENT_BRAIN_VERSION=0.5.3     install this version instead of the latest
+#   AGENT_BRAIN_VERSION=0.5.12    install this version instead of the latest
 #   AGENT_BRAIN_BIN_DIR=DIR       install directory (default ~/.local/bin)
 #   AGENT_BRAIN_NO_INTEGRATE=1    install the binary only
 #   AGENT_BRAIN_YES=1             integrate every detected assistant without asking
@@ -16,7 +16,7 @@
 
 set -eu
 
-BASE_URL="${AGENT_BRAIN_BASE_URL:-https://agentbrain.wecansync.com}"
+BASE_URL="${AGENT_BRAIN_BASE_URL:-https://agentbrain.sync.com.lb}"
 BASE_URL="${BASE_URL%/}"
 BIN_DIR="${AGENT_BRAIN_BIN_DIR:-$HOME/.local/bin}"
 VERSION="${AGENT_BRAIN_VERSION:-}"

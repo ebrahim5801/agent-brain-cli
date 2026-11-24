@@ -1,6 +1,6 @@
 # agent-brain installer for Windows.
 #
-#   irm https://agentbrain.wecansync.com/install.ps1 | iex
+#   irm https://agentbrain.sync.com.lb/install.ps1 | iex
 #
 # Downloads the prebuilt binary for this CPU, checks it against the release's
 # checksums.txt, installs it, adds its folder to your user PATH, then offers to
@@ -8,7 +8,7 @@
 # toolchain is needed. Works in Windows PowerShell 5.1 and PowerShell 7.
 #
 # Environment (set with $env:NAME = "value" before running):
-#   AGENT_BRAIN_VERSION=0.5.3     install this version instead of the latest
+#   AGENT_BRAIN_VERSION=0.5.12    install this version instead of the latest
 #   AGENT_BRAIN_BIN_DIR=DIR       install directory (default %LOCALAPPDATA%\Programs\agent-brain)
 #   AGENT_BRAIN_NO_INTEGRATE=1    install the binary only
 #   AGENT_BRAIN_YES=1             integrate every detected assistant without asking
@@ -22,7 +22,7 @@ function Install-AgentBrain {
     # Windows PowerShell 5.1 may default to TLS 1.0; the release host needs 1.2.
     try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
 
-    $base = if ($env:AGENT_BRAIN_BASE_URL) { $env:AGENT_BRAIN_BASE_URL.TrimEnd('/') } else { 'https://agentbrain.wecansync.com' }
+    $base = if ($env:AGENT_BRAIN_BASE_URL) { $env:AGENT_BRAIN_BASE_URL.TrimEnd('/') } else { 'https://agentbrain.sync.com.lb' }
     $binDir = if ($env:AGENT_BRAIN_BIN_DIR) { $env:AGENT_BRAIN_BIN_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\agent-brain' }
 
     Write-Host 'Installing agent-brain' -ForegroundColor White

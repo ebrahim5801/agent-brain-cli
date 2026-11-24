@@ -1,6 +1,6 @@
 # Releasing
 
-How to build a release and publish it to https://agentbrain.wecansync.com, the
+How to build a release and publish it to https://agentbrain.sync.com.lb, the
 site behind the one-line installers. Everything is built from this repository;
 the site's source is `site/`.
 
@@ -10,10 +10,12 @@ the site's source is `site/`.
   merge everything to `main`.
 - Check out the merge commit with a clean working tree. The builder refuses to
   run with uncommitted changes.
-- Pick a version above the one the update server offers
-  (`curl -fsS https://brain.ohnopixel.com/v1/cli/latest`). Installs check that
-  server and, with auto-update on by default, replace themselves with any
-  higher version, so a lower number would be undone at the next check.
+- Pick a version above the last one published. From 0.5.4, the binaries this
+  guide builds update from this site, so the version only has to be above
+  `curl -fsS https://agentbrain.sync.com.lb/releases/latest.json`. Installs
+  of 0.5.3 and earlier still check the cloud server
+  (`curl -fsS https://brain.ohnopixel.com/v1/cli/latest`) and, with auto-update
+  on by default, replace themselves with any higher version found there.
 - Install the Go version CI uses (`go-version` in
   `.github/workflows/release.yml`). The builds are reproducible: the same
   commit built with the same Go version gives byte-identical archives, so
@@ -22,12 +24,15 @@ the site's source is `site/`.
 ## 2. Build
 
 ```sh
-go run ./packaging/release -version 0.5.3
+go run ./packaging/release -version 0.5.12
 ```
 
 This builds Linux, macOS and Windows binaries for amd64 and arm64 with the
-same flags as `.goreleaser.yaml`, checks that the binary for this machine
-reports the new version, and writes the complete docroot to `dist/site`:
+same flags as `.goreleaser.yaml`, plus `-update-url` (default
+https://agentbrain.sync.com.lb): the binaries update from this site's
+`releases/latest.json` and `releases/<version>/` instead of the cloud server.
+It checks that the binary for this machine reports the new version, and
+writes the complete docroot to `dist/site`:
 
 | Path | What it is |
 | --- | --- |
@@ -54,8 +59,23 @@ rebuilt byte for byte from the commit it was built from:
 | 0.5.1 | 0c48102 (wecansync feat/link-offer-setting) | 1.26.9 |
 | 0.5.2 | 7e11a1a (wecansync feat/memory-list-paging) | 1.26.9 |
 | 0.5.3 | 38a36da (wecansync feat/memory-list-paging) | 1.26.9 |
+| 0.5.4 | e95b32d (wecansync feat/update-url) | 1.26.9 |
+| 0.5.5 | 65dbb8d (wecansync ci/windows) | 1.26.9 |
+| 0.5.6 | 38d8686 (wecansync fix/session-checkout) | 1.26.9 |
+| 0.5.7 | 1682ced (wecansync feat/free-local-memory) | 1.26.9 |
+| 0.5.8 | 03b808c (wecansync feat/memory-upkeep) | 1.26.9 |
+| 0.5.9 | 755442c (wecansync feat/memory-upkeep) | 1.26.10 |
+| 0.5.10 | ffbd6b6 (wecansync feat/memory-import) | 1.26.10 |
+| 0.5.11 | 5c6eab1 (wecansync feat/memory-v2-default) | 1.26.10 |
+| 0.5.12 | 7d0dc5c (wecansync feat/memory-by-session) | 1.26.10 |
+| 0.5.13 | (filled in after the build) | 1.26.11 |
 
 ## 3. Publish the site
+
+The site is published at https://agentbrain.sync.com.lb. Its former address,
+agentbrain.wecansync.com, is served from the same folder: it keeps serving
+`install.sh`, `install.ps1` and `releases/` directly, because installed binaries
+update from it, and its pages send a permanent redirect to the new address.
 
 The site is served by Apache from `/var/www/agentbrain.wecansync.com`. Build
 on the web server from a clone of this repository, then copy the new
@@ -67,8 +87,8 @@ with `AGENT_BRAIN_VERSION`.
 ```sh
 DOCROOT=/var/www/agentbrain.wecansync.com
 mkdir -p "$DOCROOT/releases"
-rsync -rt --chmod=D755,F644 dist/site/releases/0.5.3 "$DOCROOT/releases/"
-rsync -rt --chmod=D755,F644 --exclude 'releases/0.5.3' dist/site/ "$DOCROOT/"
+rsync -rt --chmod=D755,F644 dist/site/releases/0.5.12 "$DOCROOT/releases/"
+rsync -rt --chmod=D755,F644 --exclude 'releases/0.5.12' dist/site/ "$DOCROOT/"
 ```
 
 The Apache host is
@@ -79,6 +99,7 @@ renews from its own cron entry, `/etc/cron.d/certbot-agentbrain`:
 
 ```sh
 47 3 * * * root /usr/bin/certbot renew --cert-name agentbrain.wecansync.com --quiet
+47 3 * * * root /usr/bin/certbot renew --cert-name agentbrain.sync.com.lb --quiet
 ```
 
 On nginx instead, an equivalent server block:
@@ -87,7 +108,7 @@ On nginx instead, an equivalent server block:
 server {
     listen 443 ssl;
     http2 on;
-    server_name agentbrain.wecansync.com;
+    server_name agentbrain.sync.com.lb;
     # ssl_certificate / ssl_certificate_key: for example from certbot
 
     root /var/www/agentbrain.wecansync.com;
@@ -110,27 +131,30 @@ server {
 
 server {
     listen 80;
-    server_name agentbrain.wecansync.com;
+    server_name agentbrain.sync.com.lb;
     return 301 https://$host$request_uri;
 }
 ```
 
-## 4. Publish to the update server
+## 4. Publish to the update server (optional)
 
-`agent-brain update` and the background self-updater read the release from
-the backend, not from the site. Copy `dist/site/releases/<version>/manifest.json`
-and the archives it lists into the backend's release directory
-(`$AGENT_BRAIN_RELEASE_DIR`), so `/v1/cli/latest` names the new version and
-`/v1/cli/download/<filename>` serves its archives.
+Binaries built here update from this site, so step 3 publishes the update
+too. Installs of 0.5.3 and earlier, and builds made without `-update-url`,
+read the release from the backend instead. To reach them, copy
+`dist/site/releases/<version>/manifest.json` and the archives it lists into
+the backend's release directory (`$AGENT_BRAIN_RELEASE_DIR`), so
+`/v1/cli/latest` names the new version and `/v1/cli/download/<filename>`
+serves its archives. Those installs then move to this site's update channel
+with that update.
 
 ## 5. Verify
 
 ```sh
-curl -fsS https://agentbrain.wecansync.com/releases/latest.json
-cd "$(mktemp -d)" && curl -fsSLO https://agentbrain.wecansync.com/releases/0.5.3/checksums.txt \
-  && curl -fsSLO https://agentbrain.wecansync.com/releases/0.5.3/agent-brain_linux_amd64.tar.gz \
+curl -fsS https://agentbrain.sync.com.lb/releases/latest.json
+cd "$(mktemp -d)" && curl -fsSLO https://agentbrain.sync.com.lb/releases/0.5.12/checksums.txt \
+  && curl -fsSLO https://agentbrain.sync.com.lb/releases/0.5.12/agent-brain_linux_amd64.tar.gz \
   && sha256sum -c --ignore-missing checksums.txt
-curl -fsSL https://agentbrain.wecansync.com/install.sh \
+curl -fsSL https://agentbrain.sync.com.lb/install.sh \
   | AGENT_BRAIN_BIN_DIR="$(mktemp -d)" AGENT_BRAIN_NO_INTEGRATE=1 sh
 ```
 

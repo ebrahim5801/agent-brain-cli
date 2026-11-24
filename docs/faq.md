@@ -23,7 +23,8 @@ build if such a field is ever added.
 Memory is text the *assistant itself* distills at the end of a session —
 decisions made, conventions followed, what's half-finished. It is stored
 locally and served back to the assistant at the start of the next session.
-Personal memory has no network transport at all. Team memory is the one case
+Personal memory is free, needs no account, and has no network transport at
+all: turn it on with `agent-brain memory enable`. Team memory is the one case
 where memory text leaves a machine, and it requires its own explicit
 per-project consent, separate from telemetry consent, with client-side secret
 redaction and a personal-only flag for entries that should never be shared.
@@ -60,8 +61,10 @@ Costs shown in dashboards are computed from real counts only.
 
 ## What happens if I stop paying?
 
-Nothing is destroyed — lapsing pauses, never deletes. If Pro lapses, memory
-pauses with all data kept and reactivates on re-upgrade. An expired self-hosted
+Nothing is destroyed — lapsing pauses, never deletes. Personal memory is free
+and local, so it keeps working whatever your plan. If an organization's
+subscription lapses, team memory pauses with all data kept and reactivates on
+renewal. An expired self-hosted
 license degrades the instance to read-only. Your local database is yours
 regardless and is never touched by any server-side change.
 

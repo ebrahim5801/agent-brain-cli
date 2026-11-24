@@ -232,3 +232,31 @@ func TestUpdateModeDefault(t *testing.T) {
 		t.Errorf("off mode = %q, want %q", got, UpdateOff)
 	}
 }
+
+func TestUpdateURL(t *testing.T) {
+	saved := DefaultUpdateURL
+	t.Cleanup(func() { DefaultUpdateURL = saved })
+	c := &Config{}
+
+	DefaultUpdateURL = ""
+	t.Setenv("AGENT_BRAIN_UPDATE_URL", "")
+	if got := c.UpdateURL(); got != "" {
+		t.Fatalf("source build: UpdateURL = %q, want empty (cloud server)", got)
+	}
+
+	DefaultUpdateURL = "https://releases.example/"
+	if got := c.UpdateURL(); got != "https://releases.example" {
+		t.Fatalf("build default: UpdateURL = %q", got)
+	}
+
+	t.Setenv("AGENT_BRAIN_UPDATE_URL", "https://mirror.example")
+	if got := c.UpdateURL(); got != "https://mirror.example" {
+		t.Fatalf("env override: UpdateURL = %q", got)
+	}
+
+	// A plain-http override is ignored: updates replace the binary.
+	t.Setenv("AGENT_BRAIN_UPDATE_URL", "http://mirror.example")
+	if got := c.UpdateURL(); got != "https://releases.example" {
+		t.Fatalf("http override: UpdateURL = %q, want the build default", got)
+	}
+}

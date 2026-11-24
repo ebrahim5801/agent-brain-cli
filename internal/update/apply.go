@@ -75,10 +75,11 @@ func CanReplaceTarget() bool {
 // Apply downloads the asset for this platform, verifies its sha256 against the
 // manifest, extracts the binary, sanity-checks it, and atomically replaces the
 // running executable in place. It returns the resolved target path on success.
-func Apply(ctx context.Context, client *http.Client, serverURL string, asset release.Asset) (string, error) {
+func Apply(ctx context.Context, client *http.Client, src Source, res Result) (string, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 5 * time.Minute}
 	}
+	client = noDowngrade(client)
 
 	target, err := osExecutable()
 	if err != nil {
@@ -90,7 +91,8 @@ func Apply(ctx context.Context, client *http.Client, serverURL string, asset rel
 	}
 	targetDir := filepath.Dir(target)
 
-	archivePath, err := download(ctx, client, serverURL, asset, targetDir)
+	asset := res.Asset
+	archivePath, err := download(ctx, client, src.downloadURL(res.Latest, asset.Filename), asset, targetDir)
 	if err != nil {
 		return "", err
 	}
@@ -143,8 +145,7 @@ func Apply(ctx context.Context, client *http.Client, serverURL string, asset rel
 
 // download fetches the archive to a temp file in dir (same filesystem as the
 // target so the later rename is atomic) and verifies its sha256.
-func download(ctx context.Context, client *http.Client, serverURL string, asset release.Asset, dir string) (string, error) {
-	url := fmt.Sprintf("%s/v1/cli/download/%s", serverURL, asset.Filename)
+func download(ctx context.Context, client *http.Client, url string, asset release.Asset, dir string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", err

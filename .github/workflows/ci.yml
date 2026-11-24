@@ -29,12 +29,33 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.9'
+          go-version: '1.26.11'
           cache: true
       - run: go build ./...
       - run: go vet ./...
       - run: go test ./...
       - run: GORACE=atexit_sleep_ms=0 go test -race ./internal/assistant/... ./internal/cli ./internal/memory ./internal/mcpserver ./internal/store
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      # LF endings, so file comparisons and the release archives match Linux.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.11'
+          cache: true
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...
+      # Build the release, install it with install.ps1, and run its Claude Code
+      # hooks through Git Bash, as Claude Code on Windows does.
+      - name: Install and run the hooks
+        # Runs even when a test failed: it checks the installed product.
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: ./.github/scripts/windows-install-check.ps1
 
   lint:
     runs-on: ubuntu-latest
@@ -42,7 +63,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.9'
+          go-version: '1.26.11'
           cache: true
       # Pinned so lint results are reproducible; bump deliberately.
       - uses: golangci/golangci-lint-action@v9
@@ -55,7 +76,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.9'
+          go-version: '1.26.11'
           cache: true
       # Fails on ANY finding. govulncheck reports only vulnerabilities reachable
       # from the call graph, so every finding is actionable by construction.
@@ -63,6 +84,6 @@ jobs:
       # Pinned like golangci-lint above, and for a sharper reason: x/vuln v1.8.0
       # raised its own go directive to 1.26.0, so @latest scans against a
       # toolchain this workflow does not pin and the release does not ship.
-      # v1.7.0 is the last release that builds on Go 1.25. The advisory database
-      # is fetched at run time, so the pin delays no finding.
-      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+      # Keep the pin within what the pinned Go version can build. The advisory
+      # database is fetched at run time, so the pin delays no finding.
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...

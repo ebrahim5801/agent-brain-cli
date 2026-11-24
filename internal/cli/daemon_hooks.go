@@ -50,6 +50,27 @@ func removeDaemonService() error {
 	return nil
 }
 
+// restartDaemon is daemon.Restart; tests replace it so they never restart the
+// service of the machine running them.
+var restartDaemon = daemon.Restart
+
+// restartDaemonService restarts a running background service so it uses the
+// binary or schema now on disk. Best-effort: a failure is reported, not fatal.
+func restartDaemonService(quiet bool) {
+	if os.Getenv("AGENT_BRAIN_NO_DAEMON") != "" {
+		return
+	}
+	restarted, err := restartDaemon()
+	if quiet || !restarted {
+		return
+	}
+	if err != nil {
+		fmt.Printf("The background sync service could not be restarted (%v); restart it or log out and back in.\n", err)
+		return
+	}
+	fmt.Println("Restarted the background sync service.")
+}
+
 func daemonStatusLine(cfg *config.Config, st *store.Store) {
 	if !cfg.SignedIn() {
 		return

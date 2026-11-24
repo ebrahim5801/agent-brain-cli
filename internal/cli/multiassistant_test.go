@@ -32,6 +32,9 @@ func sandbox(t *testing.T) string {
 	set("AGENT_BRAIN_GEMINI_HOME", filepath.Join(root, "gemini"))
 	set("AGENT_BRAIN_OPENCODE_HOME", filepath.Join(root, "opencode"))
 	set("CODEX_HOME", filepath.Join(root, "codex"))
+	// Hook tests attribute sessions from the payload cwd, not from a real
+	// Claude Code session the tests might be running in.
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
 	return root
 }
 

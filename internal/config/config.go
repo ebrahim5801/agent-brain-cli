@@ -10,10 +10,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
+
+	"github.com/ebrahim5801/agent-brain-cli/internal/fsutil"
 )
 
 const DefaultServerURL = "https://brain.ohnopixel.com"
+
+// DefaultUpdateURL is the release site this build updates from. It is empty
+// in source, so updates come from the cloud server; a distributor that hosts
+// its own releases sets it at build time with
+// -X github.com/ebrahim5801/agent-brain-cli/internal/config.DefaultUpdateURL=https://...
+var DefaultUpdateURL = ""
 
 // TelemetryCategories is the fixed list a user consents to; shown verbatim
 // by `agent-brain consent` and recorded in the consent record.
@@ -241,6 +250,18 @@ func (c *Config) Server() string {
 	return DefaultServerURL
 }
 
+// UpdateURL resolves the release site updates come from: the
+// AGENT_BRAIN_UPDATE_URL override, then the build default. Only https sites
+// count. Empty means updates come from the cloud server (Server()).
+func (c *Config) UpdateURL() string {
+	for _, v := range []string{os.Getenv("AGENT_BRAIN_UPDATE_URL"), DefaultUpdateURL} {
+		if strings.HasPrefix(v, "https://") {
+			return strings.TrimRight(v, "/")
+		}
+	}
+	return ""
+}
+
 // Dir resolves the OS-appropriate config directory.
 // AGENT_BRAIN_CONFIG_DIR overrides it (used by tests and quickstart).
 func Dir() (string, error) {
@@ -312,7 +333,7 @@ func Save(cfg *Config) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpName, path)
+	return fsutil.Rename(tmpName, path)
 }
 
 // Update performs a locked read-modify-write so concurrent daemon and CLI

@@ -35,6 +35,23 @@ type Server struct {
 	logger *diag.Logger
 }
 
+// Tool hints let clients tell reading tools from writing ones. No tool deletes
+// anything (lifecycle changes are appended), so none is destructive. Only
+// memory_save can reach beyond this machine, through team sync.
+var falseHint = false
+
+func readOnlyTool() *mcp.ToolAnnotations {
+	return &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &falseHint}
+}
+
+func appendingTool() *mcp.ToolAnnotations {
+	return &mcp.ToolAnnotations{DestructiveHint: &falseHint, OpenWorldHint: &falseHint}
+}
+
+func savingTool() *mcp.ToolAnnotations {
+	return &mcp.ToolAnnotations{DestructiveHint: &falseHint}
+}
+
 // New builds the MCP server for the project enclosing dir. st may be nil;
 // tools then answer "temporarily unavailable".
 func New(st *store.Store, dir, version string) *Server {
@@ -42,28 +59,35 @@ func New(st *store.Store, dir, version string) *Server {
 	s.mcp = mcp.NewServer(&mcp.Implementation{Name: serverName, Version: version}, nil)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "memory_save",
+		Name:        "memory_save",
+		Annotations: savingTool(),
 		Description: "Persist one durable memory for the current project (a decision, convention, " +
 			"task state, or non-obvious fact). Use origin \"explicit\" when the developer asked for " +
 			"this to be remembered. Pass supersedes with personal [#id] entry IDs this memory replaces. " +
 			"To replace or contradict a team entry shown in the pack, pass its [team#...] handle to " +
 			"supersedes_team; the server records a supersede for your own entry or a contradiction for a " +
-			"teammate's, and both are surfaced to the team.",
+			"teammate's, and both are surfaced to the team. Evidence is optional: each item is an object " +
+			"{type, reference, digest, excerpt}. For something the user said, pass the result of " +
+			"memory_source_reference unchanged; for a file, use type \"artifact\", its repository-relative " +
+			"path and the SHA-256 of its bytes. Never pass plain strings.",
 	}, s.save)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "memory_search",
+		Name:        "memory_search",
+		Annotations: readOnlyTool(),
 		Description: "Retrieve this project's memories beyond the injected pack. Keyword match over " +
 			"active entries, most relevant first; empty query returns the most relevant entries.",
 	}, s.search)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "memory_list",
+		Annotations: readOnlyTool(),
 		Description: "List this project's memory entries, active first, newest first: 50 per page by default (limit up to 200, offset for the next page; filter by priority or kind). Use it to ground supersedes decisions before memory_save.",
 	}, s.list)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "session_summary",
+		Name:        "session_summary",
+		Annotations: appendingTool(),
 		Description: "Record a 2-3 sentence summary of this session (the goal, what changed, the outcome) " +
 			"on the local session record, so `agent-brain stats --sessions` shows what each session was. " +
 			"Stored on this machine only; never synced.",
@@ -359,12 +383,12 @@ func (s *Server) list(ctx context.Context, req *mcp.CallToolRequest, in listIn) 
 	return textResult(text), nil, nil
 }
 
-// gate re-evaluates the memory-active predicate on every call (consent,
-// entitlement, or membership may change mid-session) and resolves the current
-// project and its link. Memory is active when personal memory is active OR the
-// project is a team project the account may read (a membership benefit — no
-// Pro or sharing consent required). The error text follows the gating
-// contract: "memory is <reason>: <one-line remedy>".
+// gate re-evaluates the memory-active predicate on every call (consent or
+// membership may change mid-session) and resolves the current project and its
+// link. Memory is active when personal memory is consented OR the project is a
+// team project the account may read (a membership benefit — no sharing consent
+// required). The error text follows the gating contract: "memory is <reason>:
+// <one-line remedy>".
 func (s *Server) gate() (projectID int64, link config.Link, err error) {
 	if s.st == nil {
 		return 0, config.Link{}, gateErr("temporarily unavailable", "check `agent-brain status` and diagnostics")
@@ -393,13 +417,12 @@ func (s *Server) gate() (projectID int64, link config.Link, err error) {
 		return projectID, link, nil
 	}
 	reason := entitlement.Reason(cfg, disabled, now)
-	// On an org-linked project, personal-entitlement vocabulary ("a Pro
-	// feature", "not enabled") points at the wrong remedy: the member is gated
-	// because team access is off (lapsed org subscription, removed membership,
-	// or a capability not yet refreshed), which no personal upgrade fixes.
+	// On an org-linked project the member expects team memory, which is off
+	// (lapsed org subscription, removed membership, or a capability not yet
+	// refreshed). Say so first; free personal memory is the local alternative.
 	if link.OrgProject && reason != "disabled for this project" {
 		return 0, config.Link{}, gateErr("unavailable for this team project (membership or organization subscription inactive)",
-			"run `agent-brain sync`, then check `agent-brain status` or the organization dashboard")
+			"run `agent-brain sync`, then check `agent-brain status` or the organization dashboard; `agent-brain memory enable` turns on personal memory on this machine")
 	}
 	return 0, config.Link{}, gateErr(reason, remedy(reason))
 }
@@ -411,11 +434,7 @@ func gateErr(reason, remedy string) error {
 func remedy(reason string) string {
 	switch reason {
 	case "not enabled":
-		return "run `agent-brain memory enable`"
-	case "paused (entitlement unverified > 7 days)":
-		return "reconnect to the network and run `agent-brain status` to re-verify Pro"
-	case "a Pro feature":
-		return "upgrade on your dashboard, then run `agent-brain memory enable`"
+		return "run `agent-brain memory enable` (free; memory stays on this machine)"
 	case "disabled for this project":
 		return "run `agent-brain memory enable --project` in this project to re-enable"
 	default:
