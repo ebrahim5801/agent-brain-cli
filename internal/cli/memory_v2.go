@@ -18,7 +18,7 @@ import (
 func newMemoryUpgradeV2Cmd() *cobra.Command {
 	var apply bool
 	var previewBackend string
-	c := &cobra.Command{Use: "upgrade-v2", Short: "Preview the additive local memory schema; apply only after backup and review", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+	c := &cobra.Command{Use: "upgrade-v2", Short: "Preview the Memory V2 schema; --apply backs up a local SQLite store, then upgrades it", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		if !apply {
 			ddl := store.MemoryV2DDL
 			switch previewBackend {
@@ -31,7 +31,7 @@ func newMemoryUpgradeV2Cmd() *cobra.Command {
 			if _, err := fmt.Fprint(cmd.OutOrStdout(), ddl); err != nil {
 				return err
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), "Preview only. Back up the configured database and align all binaries before using --apply.")
+			fmt.Fprintln(cmd.OutOrStdout(), "Preview only. --apply backs up a local SQLite store first; back up a PostgreSQL store yourself and align every binary before using it.")
 			return nil
 		}
 		st, err := store.Open()
@@ -39,6 +39,20 @@ func newMemoryUpgradeV2Cmd() *cobra.Command {
 			return err
 		}
 		defer st.Close()
+		if st.MemoryV2 {
+			fmt.Fprintln(cmd.OutOrStdout(), "Memory V2 is already active.")
+			return nil
+		}
+		if st.Backend == store.BackendSQLite {
+			// A local store is backed up automatically; nothing else shares it.
+			backup, err := st.UpgradeMemoryV2WithBackup()
+			if err != nil {
+				return err
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), store.MemoryV2UpgradeNote(backup))
+			restartDaemonService(false)
+			return nil
+		}
 		if err := st.UpgradeMemoryV2(); err != nil {
 			return err
 		}
@@ -124,7 +138,7 @@ func newMemoryV2StatusCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		report := map[string]any{"schema": version, "v2_active": st.MemoryV2, "automation_enabled": os.Getenv("AGENT_BRAIN_MEMORY_V2_AUTOMATION") != "off", "ranking_enabled": os.Getenv("AGENT_BRAIN_MEMORY_V2_RANKING") != "off"}
+		report := map[string]any{"schema": version, "v2_active": st.MemoryV2, "backend": st.Backend, "automation_enabled": os.Getenv("AGENT_BRAIN_MEMORY_V2_AUTOMATION") != "off", "ranking_enabled": os.Getenv("AGENT_BRAIN_MEMORY_V2_RANKING") != "off"}
 		if path, err := os.Executable(); err == nil {
 			report["running_executable"] = path
 			if raw, err := os.ReadFile(path); err == nil {

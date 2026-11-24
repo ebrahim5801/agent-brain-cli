@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.11 - 2026-10-22
+
+### Added
+
+- `agent-brain memory export --format obsidian --out FOLDER` writes one note per memory, with properties, `agent-brain/<kind>` tags and links for replacements and related entries, plus an index note. Open the folder as an Obsidian vault to browse memories as a graph. It writes only into a new or empty folder, or one an earlier Obsidian export made, refuses a symlinked folder, and never overwrites a note it didn't write.
+
+### Changed
+
+- A new local (SQLite) store starts in the Memory V2 format, which session capture and summaries need; on the older format, saving a session summary failed. `AGENT_BRAIN_MEMORY_V2_DEFAULT=off` keeps the older format for new stores.
+- `agent-brain memory enable` upgrades an existing local store to Memory V2. It and `agent-brain memory upgrade-v2 --apply` first copy a SQLite store to `<store>.pre-v2-<time>.bak` next to it (a consistent snapshot, readable only by you). A shared PostgreSQL store is never upgraded automatically, since teammates' older binaries may use it: `enable` says how to upgrade it, and `agent-brain storage use postgres` asks you to upgrade the PostgreSQL store first when this machine's store already uses Memory V2.
+- `agent-brain update`, `memory enable`, `upgrade-v2 --apply` and `storage use` restart a running background sync service, which otherwise kept running the replaced binary or stale schema until the next login.
+
 ## 0.5.10 - 2026-10-21
 
 ### Added

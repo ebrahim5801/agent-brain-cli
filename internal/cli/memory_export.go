@@ -30,11 +30,11 @@ func newMemoryExportCmd() *cobra.Command {
 	var all bool
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "Write this project's memories as Markdown, or as JSON for `memory import` (stdout, or --out FILE)",
+		Short: "Write this project's memories as Markdown, as JSON for `memory import`, or as Obsidian notes (--out FOLDER)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if format != "markdown" && format != "json" {
-				return fmt.Errorf("--format must be markdown or json")
+			if format != "markdown" && format != "json" && format != "obsidian" {
+				return fmt.Errorf("--format must be markdown, json or obsidian")
 			}
 			st, err := store.Open()
 			if err != nil {
@@ -48,6 +48,9 @@ func newMemoryExportCmd() *cobra.Command {
 			dir, _ := os.Getwd()
 			if format == "json" {
 				return exportJSON(st, projectID, dir, all, out)
+			}
+			if format == "obsidian" {
+				return exportObsidian(st, projectID, dir, all, out)
 			}
 			var entries []memory.Ranked
 			if found {
@@ -68,7 +71,7 @@ func newMemoryExportCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&out, "out", "", "write to this file instead of stdout")
-	cmd.Flags().StringVar(&format, "format", "markdown", "markdown to read, or json to move memories with `agent-brain memory import`")
+	cmd.Flags().StringVar(&format, "format", "markdown", "markdown to read, json to move memories with `agent-brain memory import`, or obsidian for one linked note per memory in --out FOLDER")
 	cmd.Flags().BoolVar(&all, "all", false, "include superseded, completed and deleted entries")
 	return cmd
 }

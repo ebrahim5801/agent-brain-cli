@@ -51,9 +51,39 @@ func enableMemory(yes bool) error {
 		}
 	}
 
+	if err := ensureMemoryV2(); err != nil {
+		return err
+	}
+
 	fmt.Println("Personal memory is active on this machine.")
 	fmt.Println("  capture:   assistant distills context at session end + explicit saves")
 	fmt.Println("  serving:   injected at session start; agent-brain memory list to inspect")
 	fmt.Println("  privacy:   memory never leaves this machine; disable per project with `agent-brain memory disable`")
+	return nil
+}
+
+// ensureMemoryV2 upgrades a local SQLite store that predates Memory V2, after
+// a backup, because session capture and summaries need it. A PostgreSQL store
+// is only reported: teammates may share it with older binaries.
+func ensureMemoryV2() error {
+	st, err := store.Open()
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	if st.MemoryV2 {
+		return nil
+	}
+	if st.Backend != store.BackendSQLite {
+		fmt.Println("Note: this PostgreSQL store still uses the older memory format, so session capture is off.")
+		fmt.Println("  Back it up, update every teammate's agent-brain, then run `agent-brain memory upgrade-v2 --apply`.")
+		return nil
+	}
+	backup, err := st.UpgradeMemoryV2WithBackup()
+	if err != nil {
+		return fmt.Errorf("upgrade the memory store to Memory V2: %w", err)
+	}
+	fmt.Println(store.MemoryV2UpgradeNote(backup))
+	restartDaemonService(false)
 	return nil
 }

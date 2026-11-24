@@ -53,7 +53,7 @@
       <p class="eyebrow">Local stats and memory for AI coding assistants</p>
       <h1>See what your AI assistants really cost, and let them remember</h1>
       <p class="lede">agent-brain runs on your machine. It records sessions, tokens and cost across your coding assistants, and gives them project memory they can search and save. Nothing leaves your machine unless you link a project and consent.</p>
-      <p class="latest-badge"><span class="latest-badge-version" data-latest-version>v0.5.10</span> <span aria-hidden="true">&middot;</span> <a href="#changelog">What's new</a> <span aria-hidden="true">&middot;</span> <a href="/docs/#updating">Updating</a></p>
+      <p class="latest-badge"><span class="latest-badge-version" data-latest-version>v0.5.11</span> <span aria-hidden="true">&middot;</span> <a href="#changelog">What's new</a> <span aria-hidden="true">&middot;</span> <a href="/docs/#updating">Updating</a></p>
 
       <div class="tabs" id="install-tabs">
         <div role="tablist" aria-label="Operating system">
@@ -251,19 +251,27 @@
 
     <div class="release-card">
       <div class="release-head">
-        <span class="release-version">v0.5.10</span>
-        <span class="release-date">October 21, 2026</span>
+        <span class="release-version">v0.5.11</span>
+        <span class="release-date">October 22, 2026</span>
       </div>
-      <p>Take a project's memories to another machine, or share them with a colleague.</p>
+      <p>Memory works from the first session, and you can browse it in Obsidian.</p>
       <ul class="release-list">
-        <li><code class="il">agent-brain memory export --format json</code> writes a file, and <code class="il">agent-brain memory import</code> adds it to the same project on the other side.</li>
-        <li>The import shows what it will add and asks first. Entries already there are skipped, so importing twice adds nothing.</li>
-        <li>The file holds no sessions, transcripts or local paths. Imported entries start unverified and never retire an entry already on the machine.</li>
+        <li>A new memory store starts in the current format, so session capture and summaries work straight away. <code class="il">agent-brain memory enable</code> upgrades an existing one, after copying it to a backup file.</li>
+        <li><code class="il">agent-brain memory export --format obsidian --out FOLDER</code> writes your memories as linked notes. Open the folder in Obsidian to see them as a graph.</li>
+        <li>Updates and upgrades restart the background sync service, so it no longer keeps running the old version.</li>
       </ul>
     </div>
 
     <h3 class="version-history-heading">Version history</h3>
     <div class="version-history">
+      <details class="version-item">
+        <summary><span class="release-version">v0.5.10</span><span class="release-date">October 21, 2026</span><span class="version-summary">Take a project's memories to another machine, or share them with a colleague.</span></summary>
+        <ul class="release-list">
+          <li><code class="il">agent-brain memory export --format json</code> writes a file, and <code class="il">agent-brain memory import</code> adds it to the same project on the other side.</li>
+          <li>The import shows what it will add and asks first. Entries already there are skipped, so importing twice adds nothing.</li>
+          <li>The file holds no sessions, transcripts or local paths. Imported entries start unverified and never retire an entry already on the machine.</li>
+        </ul>
+      </details>
       <details class="version-item">
         <summary><span class="release-version">v0.5.9</span><span class="release-date">October 21, 2026</span><span class="version-summary">A security update.</span></summary>
         <ul class="release-list">

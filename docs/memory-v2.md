@@ -6,7 +6,16 @@ It does not add embeddings, a vector database or automatic deletion.
 
 ## Activation
 
-Installing the new binary does not activate the seven-table schema. Back up the
+Since 0.5.11 a brand-new SQLite store is created at schema 16 directly: it has
+no rows to protect, and the binary creating it is the one opening it.
+`AGENT_BRAIN_MEMORY_V2_DEFAULT=off` keeps new stores in the older format.
+`agent-brain memory enable` upgrades an existing SQLite store, and
+`agent-brain memory upgrade-v2 --apply` on SQLite first copies the store to
+`<store>.pre-v2-<time>.bak` (an online `VACUUM INTO` snapshot, readable only by
+you). Both restart a running background service afterwards. PostgreSQL stores
+keep the manual steps below, since teammates may share them with older binaries.
+
+For an existing store, installing the new binary does not activate the seven-table schema. Back up the
 configured SQLite/PostgreSQL database, test restoring the backup, stop existing
 memory processes, and align every hook/MCP/daemon on the same V2-compatible build.
 Then preview and explicitly apply:
