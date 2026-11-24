@@ -68,8 +68,17 @@ func TestMemoryActive(t *testing.T) {
 	if MemoryActive(noConsent, false, now) {
 		t.Error("no consent reported active")
 	}
-	if MemoryActive(proConfig(30*24*time.Hour), false, now) {
-		t.Error("stale entitlement reported active")
+	// Personal memory is local and free: consent alone turns it on, with no
+	// account, no plan and no recent verification.
+	if !MemoryActive(proConfig(30*24*time.Hour), false, now) {
+		t.Error("stale entitlement turned off local memory")
+	}
+	signedOut := &config.Config{Consent: config.Consents{Memory: &config.Consent{GrantedAt: "2026-01-01T00:00:00Z"}}}
+	if !MemoryActive(signedOut, false, now) {
+		t.Error("consented memory without an account reported inactive")
+	}
+	if MemoryActive(nil, false, now) {
+		t.Error("nil config reported active")
 	}
 }
 
@@ -104,12 +113,12 @@ func TestReason(t *testing.T) {
 	}{
 		{"active", proConfig(time.Hour), false, ""},
 		{"no consent", &config.Config{Entitlement: &config.Entitlement{Tier: "pro", VerifiedAt: now.Format(time.RFC3339)}}, false, "not enabled"},
-		{"paused", proConfig(30 * 24 * time.Hour), false, "paused (entitlement unverified > 7 days)"},
+		{"stale entitlement", proConfig(30 * 24 * time.Hour), false, ""},
 		{"free tier", func() *config.Config {
 			c := proConfig(time.Hour)
 			c.Entitlement.Tier = "free"
 			return c
-		}(), false, "a Pro feature"},
+		}(), false, ""},
 		{"project disabled", proConfig(time.Hour), true, "disabled for this project"},
 	}
 	for _, tc := range cases {

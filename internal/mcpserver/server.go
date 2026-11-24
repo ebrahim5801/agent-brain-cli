@@ -359,12 +359,12 @@ func (s *Server) list(ctx context.Context, req *mcp.CallToolRequest, in listIn) 
 	return textResult(text), nil, nil
 }
 
-// gate re-evaluates the memory-active predicate on every call (consent,
-// entitlement, or membership may change mid-session) and resolves the current
-// project and its link. Memory is active when personal memory is active OR the
-// project is a team project the account may read (a membership benefit — no
-// Pro or sharing consent required). The error text follows the gating
-// contract: "memory is <reason>: <one-line remedy>".
+// gate re-evaluates the memory-active predicate on every call (consent or
+// membership may change mid-session) and resolves the current project and its
+// link. Memory is active when personal memory is consented OR the project is a
+// team project the account may read (a membership benefit — no sharing consent
+// required). The error text follows the gating contract: "memory is <reason>:
+// <one-line remedy>".
 func (s *Server) gate() (projectID int64, link config.Link, err error) {
 	if s.st == nil {
 		return 0, config.Link{}, gateErr("temporarily unavailable", "check `agent-brain status` and diagnostics")
@@ -393,13 +393,12 @@ func (s *Server) gate() (projectID int64, link config.Link, err error) {
 		return projectID, link, nil
 	}
 	reason := entitlement.Reason(cfg, disabled, now)
-	// On an org-linked project, personal-entitlement vocabulary ("a Pro
-	// feature", "not enabled") points at the wrong remedy: the member is gated
-	// because team access is off (lapsed org subscription, removed membership,
-	// or a capability not yet refreshed), which no personal upgrade fixes.
+	// On an org-linked project the member expects team memory, which is off
+	// (lapsed org subscription, removed membership, or a capability not yet
+	// refreshed). Say so first; free personal memory is the local alternative.
 	if link.OrgProject && reason != "disabled for this project" {
 		return 0, config.Link{}, gateErr("unavailable for this team project (membership or organization subscription inactive)",
-			"run `agent-brain sync`, then check `agent-brain status` or the organization dashboard")
+			"run `agent-brain sync`, then check `agent-brain status` or the organization dashboard; `agent-brain memory enable` turns on personal memory on this machine")
 	}
 	return 0, config.Link{}, gateErr(reason, remedy(reason))
 }
@@ -411,11 +410,7 @@ func gateErr(reason, remedy string) error {
 func remedy(reason string) string {
 	switch reason {
 	case "not enabled":
-		return "run `agent-brain memory enable`"
-	case "paused (entitlement unverified > 7 days)":
-		return "reconnect to the network and run `agent-brain status` to re-verify Pro"
-	case "a Pro feature":
-		return "upgrade on your dashboard, then run `agent-brain memory enable`"
+		return "run `agent-brain memory enable` (free; memory stays on this machine)"
 	case "disabled for this project":
 		return "run `agent-brain memory enable --project` in this project to re-enable"
 	default:
