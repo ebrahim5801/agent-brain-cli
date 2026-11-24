@@ -21,6 +21,9 @@ type EvidenceInput struct {
 	Reference string `json:"reference" jsonschema:"Original user message ID or line:N, or repository-relative artifact path."`
 	Digest    string `json:"digest" jsonschema:"SHA256 of original message text or artifact bytes; required to detect changed sources."`
 	Excerpt   string `json:"excerpt,omitempty" jsonschema:"Relevant source excerpt; checked against the original and redacted before persistence."`
+	// Status is ignored: the server checks every item itself. It is accepted so
+	// a memory_source_reference result can be passed back unchanged.
+	Status string `json:"status,omitempty" jsonschema:"Ignored; the server verifies each item itself."`
 }
 
 func verifyEvidence(st *store.Store, in SaveInput, content string) ([]store.MemoryEvidence, error) {

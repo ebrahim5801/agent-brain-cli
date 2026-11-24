@@ -38,6 +38,7 @@ func newMemoryCmd() *cobra.Command {
 		newMemoryDisableCmd(),
 		newMemoryListCmd(),
 		newMemoryShowCmd(),
+		newMemoryExportCmd(),
 		newMemoryEditCmd(),
 		newMemoryPriorityCmd(),
 		newMemoryDeleteCmd(),

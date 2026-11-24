@@ -28,6 +28,10 @@ type Memory struct {
 	Revision     int64
 	Conflicted   bool
 	ConflictRefs string
+	// PendingReplacement is the active entry that proposes to replace this one
+	// and is still waiting for acceptance; 0 when there is none.
+	PendingReplacement int64
+
 	ID           int64
 	ProjectID    int64
 	SessionID    sql.NullInt64
