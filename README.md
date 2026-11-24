@@ -96,7 +96,7 @@ agent-brain stats --sessions   # per-session breakdown
 agent-brain memory list        # 50 entries per page by default
 agent-brain memory list --offset 50
 agent-brain memory list --limit 0  # everything
-agent-brain memory show <id>   # inspect one entry
+agent-brain memory show <id>   # inspect one entry, including the session that saved it
 agent-brain status             # integration health and collection activity
 ```
 
@@ -127,6 +127,15 @@ tags and links between entries, plus an index note: open the folder as an
 Obsidian vault to browse memories as a graph. It writes only into a new or
 empty folder, or one an earlier Obsidian export made, and never overwrites a
 note it didn't write.
+
+Every entry records the session that saved it, and `agent-brain memory show
+<id>` prints that session's ID. If one session saved memories you don't want,
+for example after it misread the task, list them with `agent-brain memory list
+--session <id>` and remove them with `agent-brain memory delete --session
+<id>`; the first 8 characters of the ID are enough. The delete shows every
+entry first and asks before changing anything. It also brings back older
+entries that the session's entries had replaced, and each entry can be
+restored with `agent-brain memory restore <id>`.
 
 To move a project's memories to another machine, or hand them to a colleague
 working on the same project, export them as JSON and import the file inside the

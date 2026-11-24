@@ -79,6 +79,7 @@ func newMemoryListCmd() *cobra.Command {
 	var asJSON bool
 	var limit int
 	var offset int
+	var session string
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List this project's memory entries",
@@ -109,6 +110,23 @@ func newMemoryListCmd() *cobra.Command {
 			}
 			if kind != "" && !memory.ValidKind(kind) {
 				return fmt.Errorf("unknown kind %q; want one of: %s", kind, strings.Join(memory.Kinds, ", "))
+			}
+			if session != "" {
+				sessions, err := st.MemorySessions(projectID)
+				if err != nil {
+					return err
+				}
+				match, err := memory.ResolveSession(sessions, session)
+				if err != nil {
+					return err
+				}
+				var mine []memory.Ranked
+				for _, r := range entries {
+					if r.Entry.SessionID.Valid && r.Entry.SessionID.Int64 == match.ID {
+						mine = append(mine, r)
+					}
+				}
+				entries = mine
 			}
 			if kind != "" || priority != "" {
 				filter := memory.Filter{Kind: kind, Priority: priority}
@@ -156,6 +174,7 @@ func newMemoryListCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&asJSON, "json", false, "machine-readable output")
 	cmd.Flags().IntVar(&limit, "limit", 50, "maximum entries to show (0 for all)")
 	cmd.Flags().IntVar(&offset, "offset", 0, "number of matching entries to skip")
+	cmd.Flags().StringVar(&session, "session", "", "only entries saved by this session (its ID or first 8+ characters, from `memory show`)")
 	return cmd
 }
 
@@ -252,6 +271,17 @@ func newMemoryShowCmd() *cobra.Command {
 				fmt.Printf("rationale: %s\n", m.Details.Rationale)
 			}
 			fmt.Printf("captured:  %s\n", m.CapturedAt)
+			if m.SessionID.Valid {
+				sessions, err := st.MemorySessions(pid)
+				if err != nil {
+					return err
+				}
+				for _, ms := range sessions {
+					if ms.ID == m.SessionID.Int64 {
+						fmt.Printf("session:   %s (started %s)\n", memory.SessionLabel(ms.ExternalID), ms.StartedAt)
+					}
+				}
+			}
 			branch, commit := m.Branch.String, m.CommitHash.String
 			if !m.CommitHash.Valid {
 				branch, commit = "-", "no repository"
@@ -377,11 +407,18 @@ func editInEditor(initial string) (string, error) {
 
 func newMemoryDeleteCmd() *cobra.Command {
 	var yes bool
+	var session string
 	cmd := &cobra.Command{
-		Use:   "delete <id>",
-		Short: "Soft-delete a memory entry (restorable)",
-		Args:  cobra.ExactArgs(1),
+		Use:   "delete <id> | --session <id>",
+		Short: "Soft-delete a memory entry, or everything one session saved (restorable)",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if (len(args) == 1) == (session != "") {
+				return fmt.Errorf("give either a memory id or --session, not both")
+			}
+			if session != "" {
+				return deleteSessionMemories(session, yes)
+			}
 			id, err := parseMemoryID(args[0])
 			if err != nil {
 				return err
@@ -410,7 +447,79 @@ func newMemoryDeleteCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "skip the confirmation prompt")
+	cmd.Flags().StringVar(&session, "session", "", "delete every active entry this session saved (its ID or first 8+ characters, from `memory show`) and bring back the entries they replaced")
 	return cmd
+}
+
+// deleteSessionMemories undoes one session's memory: it soft-deletes the
+// session's active entries and restores the entries from other sessions that
+// they replaced, which would otherwise stay hidden.
+func deleteSessionMemories(ref string, yes bool) error {
+	st, err := store.Open()
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	projectID, identity, found, err := currentProject(st)
+	if err != nil {
+		return err
+	}
+	if !found {
+		fmt.Printf("No memory for %s.\n", identity)
+		return nil
+	}
+	sessions, err := st.MemorySessions(projectID)
+	if err != nil {
+		return err
+	}
+	match, err := memory.ResolveSession(sessions, ref)
+	if err != nil {
+		return err
+	}
+	dir, _ := os.Getwd()
+	entries, err := memory.List(st, projectID, dir, true, cliGitBudget)
+	if err != nil {
+		return err
+	}
+	plan := memory.PlanSessionCleanup(entries, match.ID)
+	if len(plan.Delete) == 0 && len(plan.Restore) == 0 {
+		fmt.Printf("Session %s (started %s) has no active memories left.\n", memory.SessionLabel(match.ExternalID), match.StartedAt)
+		return nil
+	}
+	fmt.Printf("Session %s (started %s) saved %d active memories:\n", memory.SessionLabel(match.ExternalID), match.StartedAt, len(plan.Delete))
+	for _, m := range plan.Delete {
+		fmt.Printf("  #%d %s: %s\n", m.ID, m.Kind, firstLine(m.Content))
+	}
+	if len(plan.Restore) > 0 {
+		fmt.Printf("They replaced %d older memories, which come back:\n", len(plan.Restore))
+		for _, m := range plan.Restore {
+			fmt.Printf("  #%d %s: %s\n", m.ID, m.Kind, firstLine(m.Content))
+		}
+	}
+	if !yes {
+		fmt.Print("Delete them? Each one can be restored with `agent-brain memory restore <id>`. [y/N] ")
+		if !confirmYes() {
+			fmt.Println("Kept.")
+			return nil
+		}
+	}
+	at := store.Now()
+	for i, m := range plan.Delete {
+		if err := st.DeleteMemory(m.ID, at); err != nil {
+			return fmt.Errorf("deleted %d of %d, then memory %d failed: %w", i, len(plan.Delete), m.ID, err)
+		}
+	}
+	for i, m := range plan.Restore {
+		if err := st.RestoreMemory(m.ID, at); err != nil {
+			return fmt.Errorf("deleted %d; restored %d of %d, then memory %d failed: %w", len(plan.Delete), i, len(plan.Restore), m.ID, err)
+		}
+	}
+	fmt.Printf("Deleted %d memories from session %s", len(plan.Delete), memory.SessionLabel(match.ExternalID))
+	if len(plan.Restore) > 0 {
+		fmt.Printf(" and restored %d they had replaced", len(plan.Restore))
+	}
+	fmt.Println(". Restore any of them with `agent-brain memory restore <id>`.")
+	return nil
 }
 
 func newMemoryWipeCmd() *cobra.Command {

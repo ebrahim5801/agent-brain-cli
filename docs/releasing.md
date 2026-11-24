@@ -24,7 +24,7 @@ the site's source is `site/`.
 ## 2. Build
 
 ```sh
-go run ./packaging/release -version 0.5.11
+go run ./packaging/release -version 0.5.12
 ```
 
 This builds Linux, macOS and Windows binaries for amd64 and arm64 with the
@@ -67,6 +67,7 @@ rebuilt byte for byte from the commit it was built from:
 | 0.5.9 | 755442c (wecansync feat/memory-upkeep) | 1.26.10 |
 | 0.5.10 | ffbd6b6 (wecansync feat/memory-import) | 1.26.10 |
 | 0.5.11 | 5c6eab1 (wecansync feat/memory-v2-default) | 1.26.10 |
+| 0.5.12 | 7d0dc5c (wecansync feat/memory-by-session) | 1.26.10 |
 
 ## 3. Publish the site
 
@@ -80,8 +81,8 @@ with `AGENT_BRAIN_VERSION`.
 ```sh
 DOCROOT=/var/www/agentbrain.wecansync.com
 mkdir -p "$DOCROOT/releases"
-rsync -rt --chmod=D755,F644 dist/site/releases/0.5.11 "$DOCROOT/releases/"
-rsync -rt --chmod=D755,F644 --exclude 'releases/0.5.11' dist/site/ "$DOCROOT/"
+rsync -rt --chmod=D755,F644 dist/site/releases/0.5.12 "$DOCROOT/releases/"
+rsync -rt --chmod=D755,F644 --exclude 'releases/0.5.12' dist/site/ "$DOCROOT/"
 ```
 
 The Apache host is
@@ -143,8 +144,8 @@ with that update.
 
 ```sh
 curl -fsS https://agentbrain.wecansync.com/releases/latest.json
-cd "$(mktemp -d)" && curl -fsSLO https://agentbrain.wecansync.com/releases/0.5.11/checksums.txt \
-  && curl -fsSLO https://agentbrain.wecansync.com/releases/0.5.11/agent-brain_linux_amd64.tar.gz \
+cd "$(mktemp -d)" && curl -fsSLO https://agentbrain.wecansync.com/releases/0.5.12/checksums.txt \
+  && curl -fsSLO https://agentbrain.wecansync.com/releases/0.5.12/agent-brain_linux_amd64.tar.gz \
   && sha256sum -c --ignore-missing checksums.txt
 curl -fsSL https://agentbrain.wecansync.com/install.sh \
   | AGENT_BRAIN_BIN_DIR="$(mktemp -d)" AGENT_BRAIN_NO_INTEGRATE=1 sh
