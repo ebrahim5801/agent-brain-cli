@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.14 - 2026-11-24
+
+### Changed
+
+- Releases, installers and the install guide are served from
+  https://brain.ohnopixel.com again, and builds update from there. Installs
+  of 0.5.13 check agentbrain.sync.com.lb and return to this channel only once
+  this release is published there too.
+
 ## 0.5.13 - 2026-11-24
 
 ### Changed

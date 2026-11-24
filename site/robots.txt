@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://agentbrain.sync.com.lb/sitemap.xml
+Sitemap: https://brain.ohnopixel.com/sitemap.xml

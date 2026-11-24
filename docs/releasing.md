@@ -1,6 +1,6 @@
 # Releasing
 
-How to build a release and publish it to https://agentbrain.sync.com.lb, the
+How to build a release and publish it to https://brain.ohnopixel.com, the
 site behind the one-line installers. Everything is built from this repository;
 the site's source is `site/`.
 
@@ -12,7 +12,7 @@ the site's source is `site/`.
   run with uncommitted changes.
 - Pick a version above the last one published. From 0.5.4, the binaries this
   guide builds update from this site, so the version only has to be above
-  `curl -fsS https://agentbrain.sync.com.lb/releases/latest.json`. Installs
+  `curl -fsS https://brain.ohnopixel.com/releases/latest.json`. Installs
   of 0.5.3 and earlier still check the cloud server
   (`curl -fsS https://brain.ohnopixel.com/v1/cli/latest`) and, with auto-update
   on by default, replace themselves with any higher version found there.
@@ -24,12 +24,12 @@ the site's source is `site/`.
 ## 2. Build
 
 ```sh
-go run ./packaging/release -version 0.5.12
+go run ./packaging/release -version 0.5.14
 ```
 
 This builds Linux, macOS and Windows binaries for amd64 and arm64 with the
 same flags as `.goreleaser.yaml`, plus `-update-url` (default
-https://agentbrain.sync.com.lb): the binaries update from this site's
+https://brain.ohnopixel.com): the binaries update from this site's
 `releases/latest.json` and `releases/<version>/` instead of the cloud server.
 It checks that the binary for this machine reports the new version, and
 writes the complete docroot to `dist/site`:
@@ -68,93 +68,49 @@ rebuilt byte for byte from the commit it was built from:
 | 0.5.10 | ffbd6b6 (wecansync feat/memory-import) | 1.26.10 |
 | 0.5.11 | 5c6eab1 (wecansync feat/memory-v2-default) | 1.26.10 |
 | 0.5.12 | 7d0dc5c (wecansync feat/memory-by-session) | 1.26.10 |
-| 0.5.13 | 659cb5d (merged into wecansync main as c1d8ba7) | 1.26.11 |
+| 0.5.13 | c1d8ba7 (wecansync main; published only at agentbrain.sync.com.lb) | 1.26.11 |
 
 ## 3. Publish the site
 
-The site is published at https://agentbrain.sync.com.lb. Its former address,
-agentbrain.wecansync.com, is served from the same folder: it keeps serving
-`install.sh`, `install.ps1` and `releases/` directly, because installed binaries
-update from it, and its pages send a permanent redirect to the new address.
+The cloud server at https://brain.ohnopixel.com serves the site from the
+folder named by `AGENT_BRAIN_SITE_DIR` (`/var/lib/agent-brain/site` in
+production): `/install.sh`, `/install.ps1`, `/favicon.svg`, and everything
+under `/releases/`, `/docs/` and `/assets/`. The dashboard keeps `/`, so the
+site's `index.html` is copied but not served.
 
-The site is served by Apache from `/var/www/agentbrain.wecansync.com`. Build
-on the web server from a clone of this repository, then copy the new
-version's folder first and everything else second, so `latest.json` never
-names a version whose archives are not on the server yet. Do not use
-`rsync --delete`: older versions must stay downloadable for installs pinned
-with `AGENT_BRAIN_VERSION`.
-
-```sh
-DOCROOT=/var/www/agentbrain.wecansync.com
-mkdir -p "$DOCROOT/releases"
-rsync -rt --chmod=D755,F644 dist/site/releases/0.5.12 "$DOCROOT/releases/"
-rsync -rt --chmod=D755,F644 --exclude 'releases/0.5.12' dist/site/ "$DOCROOT/"
-```
-
-The Apache host is
-[packaging/apache/wecansync-agentbrain.conf](../packaging/apache/wecansync-agentbrain.conf);
-its header comment has the commands that enable it and add HTTPS. The
-server's certbot is a pip install without a renewal timer, so the certificate
-renews from its own cron entry, `/etc/cron.d/certbot-agentbrain`:
+Copy the new version's folder first and everything else second, so
+`latest.json` never names a version whose archives are not on the server yet.
+Do not use `rsync --delete`: older versions must stay downloadable for installs
+pinned with `AGENT_BRAIN_VERSION`.
 
 ```sh
-47 3 * * * root /usr/bin/certbot renew --cert-name agentbrain.wecansync.com --quiet
-47 3 * * * root /usr/bin/certbot renew --cert-name agentbrain.sync.com.lb --quiet
+SITE=brain:/var/lib/agent-brain/site
+rsync -rt --chmod=D755,F644 dist/site/releases/0.5.14 "$SITE/releases/"
+rsync -rt --chmod=D755,F644 --exclude 'releases/0.5.14' dist/site/ "$SITE/"
 ```
 
-On nginx instead, an equivalent server block:
+0.5.13 was published only at agentbrain.sync.com.lb (agentbrain.wecansync.com
+redirects there), and its binaries update from that site. Those installs move
+back to brain.ohnopixel.com only when a later release is published there too.
 
-```nginx
-server {
-    listen 443 ssl;
-    http2 on;
-    server_name agentbrain.sync.com.lb;
-    # ssl_certificate / ssl_certificate_key: for example from certbot
+## 4. Publish to the update server
 
-    root /var/www/agentbrain.wecansync.com;
-    index index.html;
-
-    add_header X-Content-Type-Options nosniff always;
-    add_header Referrer-Policy strict-origin-when-cross-origin always;
-    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" always;
-
-    # Installers and the manifest change with every release: never cache them.
-    location = /install.sh  { default_type text/plain; add_header Cache-Control "no-cache" always; }
-    location = /install.ps1 { default_type text/plain; add_header Cache-Control "no-cache" always; }
-    location = /releases/latest.json { add_header Cache-Control "no-cache" always; }
-
-    # A published version never changes.
-    location /releases/ { add_header Cache-Control "public, max-age=31536000, immutable" always; }
-
-    location / { try_files $uri $uri/ =404; }
-}
-
-server {
-    listen 80;
-    server_name agentbrain.sync.com.lb;
-    return 301 https://$host$request_uri;
-}
-```
-
-## 4. Publish to the update server (optional)
-
-Binaries built here update from this site, so step 3 publishes the update
-too. Installs of 0.5.3 and earlier, and builds made without `-update-url`,
-read the release from the backend instead. To reach them, copy
+Installs of 0.5.3 and earlier, and builds made without `-update-url`, read the
+release from the cloud server's `/v1/cli/latest` instead. To reach them, copy
 `dist/site/releases/<version>/manifest.json` and the archives it lists into
-the backend's release directory (`$AGENT_BRAIN_RELEASE_DIR`), so
-`/v1/cli/latest` names the new version and `/v1/cli/download/<filename>`
-serves its archives. Those installs then move to this site's update channel
-with that update.
+the server's release directory (`$AGENT_BRAIN_RELEASE_DIR`,
+`/var/lib/agent-brain/releases`), so `/v1/cli/latest` names the new version
+and `/v1/cli/download/<filename>` serves its archives. Those installs then
+move to the site's update channel with that update.
 
 ## 5. Verify
 
 ```sh
-curl -fsS https://agentbrain.sync.com.lb/releases/latest.json
-cd "$(mktemp -d)" && curl -fsSLO https://agentbrain.sync.com.lb/releases/0.5.12/checksums.txt \
-  && curl -fsSLO https://agentbrain.sync.com.lb/releases/0.5.12/agent-brain_linux_amd64.tar.gz \
+curl -fsS https://brain.ohnopixel.com/releases/latest.json
+cd "$(mktemp -d)" && curl -fsSLO https://brain.ohnopixel.com/releases/0.5.14/checksums.txt \
+  && curl -fsSLO https://brain.ohnopixel.com/releases/0.5.14/agent-brain_linux_amd64.tar.gz \
   && sha256sum -c --ignore-missing checksums.txt
-curl -fsSL https://agentbrain.sync.com.lb/install.sh \
+curl -fsSL https://brain.ohnopixel.com/install.sh \
   | AGENT_BRAIN_BIN_DIR="$(mktemp -d)" AGENT_BRAIN_NO_INTEGRATE=1 sh
 ```
 
